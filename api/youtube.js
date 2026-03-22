@@ -1,4 +1,6 @@
 import './loadEnv.js';
+import { parseSongTitle, parseArtistName } from '../src/lib/parseVideoTitle.js';
+import { parseJsonBody } from './parseJsonBody.js';
 
 const CHORD_REGEX = /\b[A-G][#b]?(maj|min|m|sus|add|dim|aug)?[0-9]?\b/g;
 const TABS_FLAG = /\b(tab|tabs|ultimate-guitar|songsterr)\b/i;
@@ -16,13 +18,77 @@ function countCommentMatches(comments, regex) {
   return comments.filter((c) => regex.test(c)).length;
 }
 
-function parseSongFromTitle(title) {
-  const cleaned = title.replace(/\s*(guitar lesson|how to play|tutorial|chords|easy|beginner|intermediate|advanced)\s*(\([^)]*\))?\s*$/gi, '').trim();
-  const parts = cleaned.split(/\s+[-–—|]\s+/);
-  if (parts.length >= 2) {
-    return { song: parts[0].trim(), artist: parts[1].trim() };
+/** Regex fallback when Haiku is unavailable or fails */
+function parseArtistAndSongRegex(rawTitle, channelTitle) {
+  return {
+    artist: parseArtistName(rawTitle, channelTitle),
+    song: parseSongTitle(rawTitle, channelTitle),
+  };
+}
+
+/**
+ * Claude Haiku — extract artist + song from messy YouTube guitar lesson titles.
+ * Falls back to regex if no API key or on error.
+ */
+async function parseArtistAndSong(rawTitle, channelTitle = '') {
+  const apiKey =
+    process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
+  if (!apiKey || !String(rawTitle || '').trim()) {
+    return parseArtistAndSongRegex(rawTitle, channelTitle);
   }
-  return { song: cleaned, artist: '' };
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 60,
+        messages: [
+          {
+            role: 'user',
+            content: `Extract the artist name and song name from this YouTube guitar lesson title. Return only a JSON object with no explanation, no markdown, nothing else: {"artist":"...","song":"..."}
+
+If you cannot determine the artist, return an empty string for artist.
+If you cannot determine the song, return an empty string for song.
+Never include words like "guitar", "lesson", "tutorial", "chords", "easy", "beginner", "acoustic", "cover" in either field.
+
+Title: ${JSON.stringify(String(rawTitle))}`,
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || data?.error) {
+      return parseArtistAndSongRegex(rawTitle, channelTitle);
+    }
+
+    const text = data.content?.[0]?.text?.trim() ?? '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    const artist = String(parsed.artist ?? '').trim();
+    const song = String(parsed.song ?? '').trim();
+
+    if (!song && !artist) {
+      return parseArtistAndSongRegex(rawTitle, channelTitle);
+    }
+
+    // If Haiku left song empty, merge regex for at least one usable field
+    if (!song) {
+      const fb = parseArtistAndSongRegex(rawTitle, channelTitle);
+      return { artist: artist || fb.artist, song: fb.song };
+    }
+
+    return { artist, song };
+  } catch {
+    return parseArtistAndSongRegex(rawTitle, channelTitle);
+  }
 }
 
 export default async function handler(req, res) {
@@ -36,7 +102,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'YouTube API key not configured' });
   }
 
-  const { query } = req.body || {};
+  const { query } = parseJsonBody(req.body);
   if (!query?.trim()) {
     return res.status(400).json({ error: 'Query required' });
   }
@@ -84,28 +150,43 @@ export default async function handler(req, res) {
       const snippet = v.snippet || {};
       const stats = v.statistics || {};
       const desc = snippet.description || '';
+      const rawTitle = snippet.title || '';
+      const channelTitle = snippet.channelTitle || '';
 
-      let comments = [];
-      try {
-        const commentsRes = await fetch(
-          `${baseUrl}/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance&textFormat=plainText&key=${apiKey}`
-        );
-        const commentsData = await commentsRes.json();
-        comments = (commentsData.items || []).map((c) => c.snippet?.topLevelComment?.snippet?.textDisplay || '').filter(Boolean);
-      } catch {
-        // ignore comment errors
-      }
+      const [comments, parsed] = await Promise.all([
+        (async () => {
+          try {
+            const commentsRes = await fetch(
+              `${baseUrl}/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance&textFormat=plainText&key=${apiKey}`
+            );
+            const commentsData = await commentsRes.json();
+            return (commentsData.items || [])
+              .map(
+                (c) =>
+                  c.snippet?.topLevelComment?.snippet?.textDisplay || ''
+              )
+              .filter(Boolean);
+          } catch {
+            return [];
+          }
+        })(),
+        parseArtistAndSong(rawTitle, channelTitle),
+      ]);
 
       const chordsUsed = extractChordsFromText(desc);
       const chordsFromDescription = chordsUsed.length > 0;
       const tabsAvailable = TABS_FLAG.test(desc);
 
       const tags = [];
-      if (countCommentMatches(comments, EASY_COMMENTS) >= 3) tags.push('👍 Beginner Friendly');
-      if (countCommentMatches(comments, LOVE_COMMENTS) >= 3) tags.push('❤️ Love It');
-      if (countCommentMatches(comments, ACCURATE_COMMENTS) >= 2) tags.push('✅ Accurate Chords');
+      if (countCommentMatches(comments, EASY_COMMENTS) >= 3)
+        tags.push('👍 Beginner Friendly');
+      if (countCommentMatches(comments, LOVE_COMMENTS) >= 3)
+        tags.push('❤️ Love It');
+      if (countCommentMatches(comments, ACCURATE_COMMENTS) >= 2)
+        tags.push('✅ Accurate Chords');
       const titleLower = (snippet.title || '').toLowerCase();
-      if (titleLower.includes('easy') || titleLower.includes('simple')) tags.push('⭐ Easy Lesson');
+      if (titleLower.includes('easy') || titleLower.includes('simple'))
+        tags.push('⭐ Easy Lesson');
 
       let difficultyScore = 2;
       let difficultyLabel = 'Intermediate';
@@ -128,9 +209,14 @@ export default async function handler(req, res) {
 
       return {
         videoId,
-        title: snippet.title || '',
-        channel: snippet.channelTitle || '',
-        thumbnail: snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || '',
+        title: rawTitle,
+        cleanedSong: parsed.song,
+        cleanedArtist: parsed.artist,
+        channel: channelTitle,
+        thumbnail:
+          snippet.thumbnails?.medium?.url ||
+          snippet.thumbnails?.default?.url ||
+          '',
         watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
         views: formatNum(views),
         likes: formatNum(likes),

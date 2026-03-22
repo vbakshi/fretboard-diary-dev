@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useLessons } from '../hooks/useLessons';
 import { CHORDS } from '../data/chords';
 import ChordDiagram from '../components/ChordDiagram';
-import ChordPickerModal from '../components/ChordPickerModal';
+import ChordPickerPopup from '../components/ChordPickerPopup';
 import LyricBlock from '../components/LyricBlock';
 import SequenceBuilder from '../components/SequenceBuilder';
 import ApplySequenceBar from '../components/ApplySequenceBar';
@@ -37,7 +37,8 @@ function nextSequenceLabel(sequences) {
 export default function EditorPage() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
-  const { getLesson, updateLesson } = useLessons();
+  const { getLesson, updateLesson, deleteLesson } = useLessons();
+  const location = useLocation();
   const lesson = getLesson(lessonId);
 
   const [songTitle, setSongTitle] = useState('');
@@ -47,6 +48,9 @@ export default function EditorPage() {
   const [sequences, setSequences] = useState([]);
   const [showChordPicker, setShowChordPicker] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [lyricsNotFoundToast, setLyricsNotFoundToast] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const addChordAnchorRef = useRef(null);
 
   const [applySequenceId, setApplySequenceId] = useState(null);
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
@@ -70,6 +74,13 @@ export default function EditorPage() {
       );
     }
   }, [lesson?.id]);
+
+  useEffect(() => {
+    if (location.state?.lyricsNotFound) {
+      setLyricsNotFoundToast(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.lyricsNotFound, location.pathname, navigate]);
 
   const persist = useCallback(() => {
     if (!lessonId) return;
@@ -295,6 +306,14 @@ export default function EditorPage() {
 
   const getChordData = (name) => CHORDS.find((c) => c.name === name);
 
+  const chordPaletteSet = useMemo(() => new Set(chordPalette), [chordPalette]);
+
+  const handleDeleteLesson = useCallback(() => {
+    if (!lessonId) return;
+    deleteLesson(lessonId);
+    navigate('/diary');
+  }, [lessonId, deleteLesson, navigate]);
+
   const applyDisabled =
     !applySequenceId || selectedLineIds.size === 0;
   const noLinesSelected = selectedLineIds.size === 0;
@@ -316,7 +335,19 @@ export default function EditorPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-[480px] bg-[#1a1510]">
-      <div className="z-30 flex items-start justify-between gap-2 border-b border-[#2e2b25] bg-[#1a1510] px-4 py-3">
+      {lyricsNotFoundToast && (
+        <div className="border-b border-amber-900/50 bg-amber-950/90 px-4 py-2 text-center text-sm text-amber-100">
+          <span>Lyrics not found — you can type them in manually. </span>
+          <button
+            type="button"
+            onClick={() => setLyricsNotFoundToast(false)}
+            className="text-amber-300 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      <div className="z-30 flex flex-wrap items-start justify-between gap-2 border-b border-[#2e2b25] bg-[#1a1510] px-4 py-3">
         <button
           type="button"
           onClick={() => navigate('/diary')}
@@ -334,13 +365,46 @@ export default function EditorPage() {
           />
           <p className="truncate text-sm text-brand-muted">{lesson.artist}</p>
         </div>
-        <button
-          type="button"
-          onClick={persist}
-          className="shrink-0 rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg"
-        >
-          {saved ? 'Saved ✓' : 'Save'}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {deleteConfirm ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-white">
+              <span>Delete this lesson?</span>
+              <button
+                type="button"
+                onClick={handleDeleteLesson}
+                className="rounded bg-red-700 px-2 py-1 text-white hover:bg-red-600"
+              >
+                Yes, delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(false)}
+                className="rounded border border-brand-border px-2 py-1 text-brand-muted hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(true)}
+                className="rounded px-2 py-1.5 text-lg leading-none text-brand-muted hover:text-red-400"
+                aria-label="Delete lesson"
+                title="Delete lesson"
+              >
+                🗑
+              </button>
+              <button
+                type="button"
+                onClick={persist}
+                className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg"
+              >
+                {saved ? 'Saved ✓' : 'Save'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-[#2e2b25] bg-[#1a1510]">
@@ -374,7 +438,7 @@ export default function EditorPage() {
           <p className="mb-2 text-[10px] font-normal uppercase tracking-[0.1em] text-[#6b6560]">
             CHORD PALETTE
           </p>
-          <div className="scrollbar-none -mx-4 flex gap-3 overflow-x-auto overflow-y-visible px-4 pb-10 pt-2">
+          <div className="scrollbar-none -mx-4 flex gap-3 overflow-x-auto overflow-y-visible px-4 pb-3 pt-2">
             {chordPalette.map((name) => {
               const data = getChordData(name);
               return (
@@ -430,14 +494,24 @@ export default function EditorPage() {
                 </div>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setShowChordPicker(true)}
-              className="flex h-[82px] w-[60px] shrink-0 flex-col items-center justify-center rounded-[10px] border border-dashed border-[#3d3830] text-[#4d4840] transition-colors duration-150 ease-in-out hover:border-[#EF9F27] hover:text-[#EF9F27]"
-              style={{ borderWidth: '1px' }}
-            >
-              + Add
-            </button>
+            <div className="relative shrink-0 self-start">
+              <button
+                ref={addChordAnchorRef}
+                type="button"
+                onClick={() => setShowChordPicker((v) => !v)}
+                className="flex h-[82px] w-[60px] flex-col items-center justify-center rounded-[10px] border border-dashed border-[#3d3830] text-[#4d4840] transition-colors duration-150 ease-in-out hover:border-[#EF9F27] hover:text-[#EF9F27]"
+                style={{ borderWidth: '1px' }}
+              >
+                + Add
+              </button>
+              <ChordPickerPopup
+                open={showChordPicker}
+                onClose={() => setShowChordPicker(false)}
+                onSelectChord={addChordToPalette}
+                paletteSet={chordPaletteSet}
+                anchorRef={addChordAnchorRef}
+              />
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1">
@@ -481,14 +555,6 @@ export default function EditorPage() {
           />
         </div>
 
-        {showChordPicker && (
-          <div className="px-4 pb-4">
-            <ChordPickerModal
-              onSelect={addChordToPalette}
-              onCancel={() => setShowChordPicker(false)}
-            />
-          </div>
-        )}
       </div>
 
       <div className="px-4 py-4">

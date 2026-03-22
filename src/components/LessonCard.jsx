@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLessons } from '../hooks/useLessons';
 import { getAICache, setAICache } from '../hooks/useSearch';
 import { migrateLine, createEmptySlots } from '../utils/slots';
-import { fetchLyricsForLesson } from '../../lib/lyricsShared.js';
+import { fetchLyricsPreferApiFirst } from '../lib/lyricsShared.js';
+import { parseVideoTitle } from '../lib/parseVideoTitle.js';
 
 const DIFFICULTY_STYLES = {
   Beginner: 'bg-green-600/30 text-green-400 border-green-500/50',
@@ -11,59 +12,10 @@ const DIFFICULTY_STYLES = {
   Advanced: 'bg-red-600/30 text-red-400 border-red-500/50',
 };
 
-const LESSON_STEPS = [
-  { id: 'parse', label: 'Read song & artist from video title' },
-  { id: 'fetch', label: 'Fetch lyrics from music library' },
-  { id: 'verses', label: 'Organize into verses & sections' },
-  { id: 'save', label: 'Save lesson to your diary' },
-];
-
-function delay(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function StepRow({ label, status }) {
-  const done = status === 'done';
-  const running = status === 'running';
-  const err = status === 'error';
-
-  return (
-    <li className="flex items-start gap-3 text-left text-sm">
-      <span
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]"
-        style={{
-          borderWidth: '0.5px',
-          borderColor: done ? '#6b4e10' : err ? '#8a3a3a' : '#3d3830',
-          background: done ? '#2e2510' : 'transparent',
-          color: done ? '#EF9F27' : err ? '#cc6666' : '#6b6560',
-        }}
-      >
-        {done ? '✓' : err ? '!' : running ? '…' : '○'}
-      </span>
-      <span
-        className={
-          done
-            ? 'text-[#d4cfc8]'
-            : running
-              ? 'font-medium text-[#EF9F27]'
-              : err
-                ? 'text-[#cc6666]'
-                : 'text-[#6b6560]'
-        }
-      >
-        {label}
-      </span>
-    </li>
-  );
-}
-
 export default function LessonCard({ video, onFetchSummarize }) {
   const navigate = useNavigate();
   const { createLesson } = useLessons();
   const [loading, setLoading] = useState(false);
-  const [stepStates, setStepStates] = useState(() =>
-    LESSON_STEPS.map((s) => ({ ...s, status: 'pending' }))
-  );
   const [aiData, setAIData] = useState(() => getAICache(video.videoId));
 
   const chordsToShow = aiData?.chordsUsed?.length
@@ -88,65 +40,67 @@ export default function LessonCard({ video, onFetchSummarize }) {
     });
   }, [needsAI, video.videoId, video.transcript, video.title, onFetchSummarize]);
 
-  const updateStep = useCallback((id, status) => {
-    setStepStates((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status } : s))
-    );
-  }, []);
-
-  const resetSteps = useCallback(() => {
-    setStepStates(LESSON_STEPS.map((s) => ({ ...s, status: 'pending' })));
-  }, []);
-
   const handleCreateLesson = async () => {
-    resetSteps();
     setLoading(true);
+    try {
+      const parsed =
+        typeof video.cleanedSong === 'string' ||
+        typeof video.cleanedArtist === 'string'
+          ? {
+              song: video.cleanedSong ?? '',
+              artist: video.cleanedArtist ?? '',
+            }
+          : parseVideoTitle(video.title, video.channel || '');
+      const song = parsed.song;
+      const artist = parsed.artist;
+      const placeholderSection = {
+        label: 'Verse 1',
+        lines: [
+          {
+            text: 'Add your lyrics here...',
+            slots: createEmptySlots(),
+          },
+        ],
+        practiceNote: '',
+      };
 
-    const run = async () => {
-      updateStep('parse', 'running');
-      await delay(120);
-      const { song, artist } = parseSongFromTitle(video.title);
-      updateStep('parse', 'done');
+      let songTitle = song;
+      let artistOut = artist;
+      let sections = [placeholderSection];
+      let lyricsNotFound = true;
 
-      updateStep('fetch', 'running');
-      let data;
       try {
-        data = await fetchLyricsForLesson(song, artist);
-      } catch {
-        data = { error: 'Lyrics not found', sections: [] };
-      }
-      if (data.error || !data.sections?.length) {
-        updateStep('fetch', 'error');
-      } else {
-        updateStep('fetch', 'done');
-      }
-
-      updateStep('verses', 'running');
-      await delay(180);
-      updateStep('verses', 'done');
-
-      updateStep('save', 'running');
-
-      let sections = [
-        {
-          label: 'Verse 1',
-          lines: [{ text: '', slots: createEmptySlots() }],
-          practiceNote: '',
-        },
-      ];
-
-      if (data.sections?.length && !data.error) {
-        sections = data.sections.map((s) => ({
-          label: s.label || 'Verse',
-          lines: (s.lines || []).map((l) =>
-            migrateLine({
-              text: typeof l === 'string' ? l : l.text || '',
-              chords: Array.isArray(l?.chords) ? l.chords : [],
-              slots: l.slots,
+        // POST /api/lyrics with song + artist from video.cleanedSong / cleanedArtist (Haiku-parsed on search).
+        const data = await fetchLyricsPreferApiFirst(song, artist);
+        const hasLyrics =
+          !data.error &&
+          Array.isArray(data.sections) &&
+          data.sections.some((s) =>
+            (s.lines || []).some((l) => {
+              const t = typeof l === 'string' ? l : l?.text || '';
+              return String(t).trim().length > 0;
             })
-          ),
-          practiceNote: s.practiceNote || '',
-        }));
+          );
+
+        if (hasLyrics) {
+          lyricsNotFound = false;
+          if (data.title) songTitle = data.title;
+          if (data.artist) artistOut = data.artist;
+          sections = data.sections.map((s) => ({
+            label: s.label,
+            lines: (s.lines || []).map((l) =>
+              migrateLine({
+                text: typeof l === 'string' ? l : l.text || '',
+                chords: Array.isArray(l?.chords) ? l.chords : [],
+                slots: l.slots,
+              })
+            ),
+            practiceNote: s.practiceNote || '',
+          }));
+        }
+      } catch {
+        lyricsNotFound = true;
+        sections = [placeholderSection];
       }
 
       const chordPalette = [
@@ -154,8 +108,8 @@ export default function LessonCard({ video, onFetchSummarize }) {
       ].filter(Boolean);
 
       const lesson = createLesson({
-        songTitle: data.title || song,
-        artist: data.artist || artist,
+        songTitle: songTitle,
+        artist: artistOut,
         sequences: [],
         referenceVideo: {
           videoId: video.videoId,
@@ -169,13 +123,9 @@ export default function LessonCard({ video, onFetchSummarize }) {
         sections,
       });
 
-      updateStep('save', 'done');
-      await delay(250);
-      navigate(`/editor/${lesson.id}`);
-    };
-
-    try {
-      await run();
+      navigate(`/editor/${lesson.id}`, {
+        state: lyricsNotFound ? { lyricsNotFound: true } : undefined,
+      });
     } finally {
       setLoading(false);
     }
@@ -243,65 +193,10 @@ export default function LessonCard({ video, onFetchSummarize }) {
             disabled={loading}
             className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Working…' : '+ Create My Lesson'}
+            {loading ? 'Fetching lyrics...' : '+ Create My Lesson'}
           </button>
         </div>
       </div>
-
-      {loading && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lesson-fetch-title"
-        >
-          <div
-            className="w-full max-w-sm rounded-[10px] border border-[#2e2b25] bg-[#2a2318] p-5 shadow-none"
-            style={{ borderWidth: '0.5px' }}
-          >
-            <p
-              id="lesson-fetch-title"
-              className="mb-1 text-[10px] font-normal uppercase tracking-[0.1em] text-[#6b6560]"
-            >
-              Creating lesson
-            </p>
-            <p className="mb-4 text-base font-medium text-white">Setting up your editor…</p>
-            <ul className="space-y-3">
-              {stepStates.map((s) => (
-                <StepRow key={s.id} label={s.label} status={s.status} />
-              ))}
-            </ul>
-            <p className="mt-4 text-xs text-[#6b6560]">
-              If lyrics aren’t found, you can still add them manually in the editor.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
-
-function parseSongFromTitle(title) {
-  let cleaned = title
-    .replace(
-      /\s*(guitar lesson|how to play|on guitar|tutorial|chords|cover|easy|beginner|intermediate|advanced)\s*(\([^)]*\))?\s*$/gi,
-      ''
-    )
-    .trim();
-
-  const byMatch = cleaned.match(
-    /^(?:how\s+to\s+play\s+)?(.+?)\s+by\s+(.+?)$/i
-  );
-  if (byMatch) {
-    return { song: byMatch[1].trim(), artist: byMatch[2].trim() };
-  }
-
-  const parts = cleaned.split(/\s+[-–—|]\s+/);
-  if (parts.length >= 2) {
-    return {
-      song: parts[0].trim(),
-      artist: parts.slice(1).join(' - ').trim(),
-    };
-  }
-  return { song: cleaned, artist: '' };
 }

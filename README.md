@@ -1,4 +1,15 @@
-# React + Vite
+# Fretboard Diary
+
+## Environment variables
+
+Put API keys in **`.env.local`** (gitignored). Copy from `.env.example` and fill in values.
+
+- **Vite** (`npm run dev`) reads `.env.local` for `VITE_*` variables.
+- **API routes** (`npm run dev:full` / `vercel dev`) load `.env` then **`.env.local`** via [`api/loadEnv.js`](api/loadEnv.js), so `YOUTUBE_API_KEY`, `ANTHROPIC_API_KEY`, etc. are available to `/api/*` without a `VITE_` prefix.
+
+---
+
+## React + Vite (template)
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

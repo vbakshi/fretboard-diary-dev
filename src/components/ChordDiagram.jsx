@@ -1,11 +1,12 @@
 export default function ChordDiagram({ name, frets, fingers, baseFret = 1, barres = [], size = 'sm' }) {
   const isLg = size === 'lg';
   const isPalette = size === 'palette';
+  const isMini = size === 'mini';
   const scale = isLg ? 1.5 : 1;
 
   const stringX = isLg ? [12, 24, 36, 48, 60, 72] : [8, 18, 28, 38, 48, 56];
-  const width = isLg ? 96 : isPalette ? 56 : 64;
-  const height = isLg ? 138 : isPalette ? 78 : 92;
+  const width = isLg ? 96 : isMini ? 40 : isPalette ? 56 : 64;
+  const height = isLg ? 138 : isMini ? 56 : isPalette ? 78 : 92;
   const nutY = 18 * scale;
   const fretY = [nutY, 26 * scale, 42 * scale, 58 * scale, 74 * scale];
 
@@ -18,8 +19,8 @@ export default function ChordDiagram({ name, frets, fingers, baseFret = 1, barre
   const f = frets || [];
   const fin = fingers || [];
 
-  const viewW = isPalette ? 64 : width;
-  const viewH = isPalette ? 92 : height;
+  const viewW = isPalette || isMini ? 64 : width;
+  const viewH = isPalette || isMini ? 92 : height;
 
   return (
     <svg
@@ -27,7 +28,7 @@ export default function ChordDiagram({ name, frets, fingers, baseFret = 1, barre
       height={height}
       viewBox={`0 0 ${viewW} ${viewH}`}
       className="block shrink-0"
-      aria-label={`Chord diagram for ${name}`}
+      aria-label={name ? `Chord diagram for ${name}` : 'Chord diagram'}
     >
       {/* Nut bar */}
       <rect
@@ -166,7 +167,7 @@ export default function ChordDiagram({ name, frets, fingers, baseFret = 1, barre
       )}
 
       {/* Chord name (palette shows name in parent row) */}
-      {!isPalette ? (
+      {!isPalette && !isMini ? (
         <text
           x={viewW / 2}
           y={viewH - 4}

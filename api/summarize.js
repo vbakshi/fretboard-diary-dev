@@ -1,4 +1,5 @@
 import './loadEnv.js';
+import { parseJsonBody } from './parseJsonBody.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ chordsUsed: [], tabsDiscussed: false, summary: null });
   }
 
-  const { videoId, transcript, title } = req.body || {};
+  const { videoId, transcript, title } = parseJsonBody(req.body);
   if (!videoId || !transcript?.trim()) {
     return res.status(200).json({ chordsUsed: [], tabsDiscussed: false, summary: null });
   }

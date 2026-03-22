@@ -2,13 +2,20 @@
  * Proxies YouTube search suggestions (Google suggestqueries) — avoids browser CORS.
  * Response shape: ["query", ["suggestion1", ...], ...]
  */
+import { parseJsonBody } from './parseJsonBody.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const raw =
-    req.method === 'GET' ? req.query?.q : req.body?.query ?? req.body?.q;
+  let raw;
+  if (req.method === 'GET') {
+    raw = req.query?.q ?? req.query?.query;
+  } else {
+    const body = parseJsonBody(req.body);
+    raw = body?.query ?? body?.q;
+  }
   const q = typeof raw === 'string' ? raw.trim() : '';
 
   if (q.length < 2) {

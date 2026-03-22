@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLessons } from '../hooks/useLessons';
 
@@ -15,67 +15,97 @@ function formatRelative(dateStr) {
 }
 
 function DiaryCard({ lesson, onDelete }) {
-  const [showDelete, setShowDelete] = useState(false);
-  const longPressTimer = useRef(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
-  const handleLongPressStart = () => {
-    longPressTimer.current = setTimeout(() => setShowDelete(true), 500);
-  };
-  const handleLongPressEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  const handleConfirmDelete = () => {
+    setRemoving(true);
+    window.setTimeout(() => {
+      onDelete(lesson.id);
+    }, 300);
   };
 
   return (
     <div
-      className="relative"
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setShowDelete(true);
-      }}
-      onTouchStart={handleLongPressStart}
-      onTouchEnd={handleLongPressEnd}
+      className={`relative transition-opacity duration-300 ease-out ${
+        removing ? 'opacity-0' : 'opacity-100'
+      }`}
     >
-      <Link to={`/editor/${lesson.id}`} className="block">
-        <div className="flex gap-3 p-3 rounded-lg bg-brand-surface border border-brand-border hover:border-brand-amber/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-white text-lg">{lesson.songTitle || 'Untitled'}</h3>
-          <p className="text-brand-muted text-sm">{lesson.artist || 'Unknown artist'}</p>
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {(lesson.chordPalette || []).slice(0, 4).map((c) => (
-              <span
-                key={c}
-                className="text-xs px-1.5 py-0.5 rounded bg-brand-amber/20 text-brand-amber"
-              >
-                {c}
-              </span>
-            ))}
+      <Link
+        to={`/editor/${lesson.id}`}
+        className={`block rounded-lg border border-brand-border bg-brand-surface transition-colors hover:border-brand-amber/50 ${
+          confirmDelete ? 'pointer-events-none opacity-40' : ''
+        }`}
+        onClick={(e) => {
+          if (confirmDelete) e.preventDefault();
+        }}
+      >
+        <div className="flex gap-3 p-3 pr-12">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-white">
+              {lesson.songTitle || 'Untitled'}
+            </h3>
+            <p className="text-sm text-brand-muted">{lesson.artist || 'Unknown artist'}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {(lesson.chordPalette || []).slice(0, 4).map((c) => (
+                <span
+                  key={c}
+                  className="rounded bg-brand-amber/20 px-1.5 py-0.5 text-xs text-brand-amber"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-brand-muted">
+              {formatRelative(lesson.updatedAt)}
+            </p>
           </div>
-          <p className="text-brand-muted text-xs mt-1">
-            {formatRelative(lesson.updatedAt)}
-          </p>
-        </div>
-        {lesson.referenceVideo?.thumbnail && (
-          <img
-            src={lesson.referenceVideo.thumbnail}
-            alt=""
-            className="w-14 h-10 object-cover rounded shrink-0"
-          />
-        )}
+          {lesson.referenceVideo?.thumbnail && (
+            <img
+              src={lesson.referenceVideo.thumbnail}
+              alt=""
+              className="h-10 w-14 shrink-0 rounded object-cover"
+            />
+          )}
         </div>
       </Link>
-      {showDelete && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(lesson.id);
-          }}
-          className="absolute top-2 right-2 px-2 py-1 text-xs bg-red-600 text-white rounded z-10"
-        >
-          Delete
-        </button>
-      )}
+
+      <div className="absolute right-2 top-2 z-10">
+        {confirmDelete ? (
+          <div className="flex max-w-[220px] flex-col gap-2 rounded-lg border border-brand-border bg-brand-bg p-2 text-xs shadow-lg">
+            <p className="text-white">Delete this lesson?</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="rounded bg-red-700 px-2 py-1 text-white hover:bg-red-600"
+              >
+                Yes, delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="rounded border border-brand-border px-2 py-1 text-brand-muted hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setConfirmDelete(true);
+            }}
+            className="rounded p-1 text-lg leading-none text-brand-muted hover:text-red-400"
+            aria-label="Delete lesson"
+          >
+            🗑
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -87,29 +117,21 @@ export default function DiaryPage() {
   );
 
   return (
-    <div className="px-4 py-6 max-w-[480px] mx-auto">
-      <h1 className="text-2xl font-semibold text-white mb-4">My Lessons</h1>
+    <div className="mx-auto max-w-[480px] px-4 py-6">
+      <h1 className="mb-4 text-2xl font-semibold text-white">My Lessons</h1>
 
       {sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <span className="text-5xl mb-4">🎸</span>
-          <p className="text-brand-muted text-lg mb-2">No lessons yet</p>
-          <Link
-            to="/"
-            className="text-brand-amber hover:underline"
-          >
+          <span className="mb-4 text-5xl">🎸</span>
+          <p className="mb-2 text-lg text-brand-muted">No lessons yet</p>
+          <Link to="/" className="text-brand-amber hover:underline">
             Search for a song to get started
           </Link>
         </div>
       ) : (
         <div className="space-y-3">
           {sorted.map((lesson) => (
-            <div key={lesson.id} className="relative">
-              <DiaryCard
-                lesson={lesson}
-                onDelete={deleteLesson}
-              />
-            </div>
+            <DiaryCard key={lesson.id} lesson={lesson} onDelete={deleteLesson} />
           ))}
         </div>
       )}

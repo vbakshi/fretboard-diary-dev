@@ -36,11 +36,11 @@ function buildSuggestions(query, recentSearches, remoteSuggestions) {
   return merged.slice(0, 12);
 }
 
+/** idle: no search yet | loading | results | empty */
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [searchState, setSearchState] = useState('idle');
   const [error, setError] = useState(null);
 
   const [focused, setFocused] = useState(false);
@@ -109,15 +109,15 @@ export default function SearchPage() {
     if (!trimmed) return;
 
     setFocused(false);
-    setSubmitted(true);
     setError(null);
     const cached = getCachedSearch(trimmed);
     if (cached) {
       setResults(cached);
+      setSearchState(cached.length > 0 ? 'results' : 'empty');
       return;
     }
 
-    setLoading(true);
+    setSearchState('loading');
     setResults(null);
     try {
       const res = await fetch('/api/youtube', {
@@ -129,20 +129,22 @@ export default function SearchPage() {
       if (Array.isArray(data)) {
         setSearchCache(trimmed, data);
         setResults(data);
+        setSearchState(data.length > 0 ? 'results' : 'empty');
       } else if (data?.error) {
         setError(data.error);
         setResults([]);
+        setSearchState('empty');
       } else {
         setResults([]);
+        setSearchState('empty');
       }
       addRecentSearch(trimmed);
-    } catch (err) {
+    } catch {
       setError(
         'Search API unavailable. Run "npx vercel dev" for full-stack local development (or deploy to Vercel).'
       );
       setResults([]);
-    } finally {
-      setLoading(false);
+      setSearchState('empty');
     }
   }, [query]);
 
@@ -204,8 +206,8 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="px-4 py-6 max-w-[480px] mx-auto">
-      <h1 className="text-2xl font-semibold text-brand-amber mb-4">
+    <div className="mx-auto max-w-[480px] px-4 py-6">
+      <h1 className="mb-4 text-2xl font-semibold text-brand-amber">
         Fretboard Diary
       </h1>
 
@@ -232,7 +234,7 @@ export default function SearchPage() {
             placeholder="Search a song or artist..."
             autoComplete="off"
             enterKeyHint="search"
-            className="w-full px-4 py-3 rounded-lg bg-brand-surface border border-brand-border text-white placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-amber"
+            className="w-full rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-white placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-amber"
           />
           {showDropdown && (
             <ul
@@ -246,7 +248,7 @@ export default function SearchPage() {
                   id={`${listId}-opt-${i}`}
                   role="option"
                   aria-selected={i === highlightIndex}
-                  className={`cursor-pointer px-4 py-3 text-left text-sm text-white min-h-[44px] flex items-center ${
+                  className={`flex min-h-[44px] cursor-pointer items-center px-4 py-3 text-left text-sm text-white ${
                     i === highlightIndex ? 'bg-brand-bg' : 'hover:bg-brand-bg/80'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
@@ -262,16 +264,16 @@ export default function SearchPage() {
 
       {recentSearches.length > 0 && (
         <div className="mb-4">
-          <p className="text-brand-muted text-xs uppercase tracking-wide mb-2">
+          <p className="mb-2 text-xs uppercase tracking-wide text-brand-muted">
             Recent searches
           </p>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             {recentSearches.map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => handleRecentClick(q)}
-                className="shrink-0 px-3 py-1.5 rounded-full bg-brand-surface border border-brand-border text-brand-muted hover:text-white hover:border-brand-amber text-sm"
+                className="shrink-0 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-sm text-brand-muted hover:border-brand-amber hover:text-white"
               >
                 {q}
               </button>
@@ -280,35 +282,38 @@ export default function SearchPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {loading && (
-          <>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </>
-        )}
-        {!loading && submitted && results && results.length === 0 && (
-          <div className="text-center py-8">
-            {error ? (
-              <p className="text-brand-amber/90 text-sm max-w-sm mx-auto">
-                {error}
-              </p>
-            ) : (
-              <p className="text-brand-muted">No lessons found. Try a different search.</p>
-            )}
-          </div>
-        )}
-        {!loading && results && results.length > 0 && (
-          results.map((video) => (
+      {searchState === 'loading' && (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      )}
+
+      {searchState === 'results' && results && results.length > 0 && (
+        <div className="space-y-3">
+          {/* Each video includes cleanedSong + cleanedArtist (Claude Haiku in /api/youtube); LessonCard uses them for /api/lyrics */}
+          {results.map((video) => (
             <LessonCard
               key={video.videoId}
               video={video}
               onFetchSummarize={fetchSummarize}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {searchState === 'empty' && (
+        <div className="py-12 text-center">
+          {error ? (
+            <p className="mx-auto max-w-sm text-sm text-brand-amber/90">{error}</p>
+          ) : (
+            <p className="text-brand-muted">
+              No lessons found for this search — try a different song or artist
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
