@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   getCachedSearch,
   setSearchCache,
+  clearSearchCacheForQuery,
   getRecentSearches,
   addRecentSearch,
 } from '../hooks/useSearch';
@@ -42,6 +43,10 @@ export default function SearchPage() {
   const [results, setResults] = useState(null);
   const [searchState, setSearchState] = useState('idle');
   const [error, setError] = useState(null);
+  /** True when last search came from localStorage (skipped /api/youtube). */
+  const [usedCache, setUsedCache] = useState(false);
+  /** Query string used for the current result list (passed to Haiku when creating a lesson). */
+  const [searchQueryForResults, setSearchQueryForResults] = useState('');
 
   const [focused, setFocused] = useState(false);
   const [remoteSuggestions, setRemoteSuggestions] = useState([]);
@@ -104,19 +109,25 @@ export default function SearchPage() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  const handleSearch = useCallback(async (explicitQuery) => {
+  const handleSearch = useCallback(async (explicitQuery, opts = {}) => {
+    const { forceRefresh = false } = opts;
     const trimmed = (explicitQuery !== undefined ? explicitQuery : query).trim();
     if (!trimmed) return;
 
     setFocused(false);
     setError(null);
-    const cached = getCachedSearch(trimmed);
-    if (cached) {
-      setResults(cached);
-      setSearchState(cached.length > 0 ? 'results' : 'empty');
-      return;
+    if (!forceRefresh) {
+      const cached = getCachedSearch(trimmed);
+      if (cached) {
+        setUsedCache(true);
+        setSearchQueryForResults(trimmed);
+        setResults(cached);
+        setSearchState(cached.length > 0 ? 'results' : 'empty');
+        return;
+      }
     }
 
+    setUsedCache(false);
     setSearchState('loading');
     setResults(null);
     try {
@@ -127,6 +138,7 @@ export default function SearchPage() {
       });
       const data = await res.json();
       if (Array.isArray(data)) {
+        setSearchQueryForResults(trimmed);
         setSearchCache(trimmed, data);
         setResults(data);
         setSearchState(data.length > 0 ? 'results' : 'empty');
@@ -147,6 +159,13 @@ export default function SearchPage() {
       setSearchState('empty');
     }
   }, [query]);
+
+  const refreshSearch = useCallback(() => {
+    const q = query.trim();
+    if (!q) return;
+    clearSearchCacheForQuery(q);
+    handleSearch(q, { forceRefresh: true });
+  }, [query, handleSearch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -292,11 +311,29 @@ export default function SearchPage() {
 
       {searchState === 'results' && results && results.length > 0 && (
         <div className="space-y-3">
-          {/* Each video includes cleanedSong + cleanedArtist (Claude Haiku in /api/youtube); LessonCard uses them for /api/lyrics */}
+          {usedCache && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
+            >
+              <span>
+                Showing cached results — no new YouTube search.
+              </span>
+              <button
+                type="button"
+                onClick={refreshSearch}
+                className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
+              >
+                Refresh search
+              </button>
+            </div>
+          )}
+          {/* cleanedSong/cleanedArtist are regex-only from search; Haiku runs in /api/parseVideoTitle when you create a lesson */}
           {results.map((video) => (
             <LessonCard
               key={video.videoId}
               video={video}
+              searchQuery={searchQueryForResults}
               onFetchSummarize={fetchSummarize}
             />
           ))}
@@ -305,6 +342,21 @@ export default function SearchPage() {
 
       {searchState === 'empty' && (
         <div className="py-12 text-center">
+          {usedCache && !error && (
+            <div
+              role="status"
+              className="mx-auto mb-4 flex max-w-sm flex-wrap items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
+            >
+              <span>Cached empty result — no new API call.</span>
+              <button
+                type="button"
+                onClick={refreshSearch}
+                className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
+              >
+                Refresh search
+              </button>
+            </div>
+          )}
           {error ? (
             <p className="mx-auto max-w-sm text-sm text-brand-amber/90">{error}</p>
           ) : (

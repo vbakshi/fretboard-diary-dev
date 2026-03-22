@@ -347,11 +347,20 @@ export async function fetchLyricsPreferApiFirst(song, artist) {
     const textPreview = !ct.includes('application/json') ? await res.clone().text().then((t) => t.slice(0, 120)) : '';
 
     if (!res.ok) {
+      let jsonErr = null;
+      try {
+        if (ct.includes('application/json')) {
+          jsonErr = await res.clone().json();
+        }
+      } catch {
+        /* ignore */
+      }
       lyricsFail('POST /api/lyrics non-OK', {
         status: res.status,
         statusText: res.statusText,
         contentType: ct,
         bodyPreview: textPreview,
+        json: jsonErr,
       });
     } else if (!ct.includes('application/json')) {
       lyricsFail('POST /api/lyrics not JSON', { contentType: ct, bodyPreview: textPreview });

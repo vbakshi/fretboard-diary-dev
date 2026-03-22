@@ -8,6 +8,9 @@
     },
     "api/youtube.js": {
       "includeFiles": "src/lib/parseVideoTitle.js"
+    },
+    "api/parseVideoTitle.js": {
+      "includeFiles": "src/lib/parseVideoTitle.js"
     }
   }
 }

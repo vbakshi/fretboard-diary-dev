@@ -1,6 +1,6 @@
 /**
  * Strip YouTube guitar-lesson noise and split artist / song for lyrics lookup.
- * Used by /api/youtube (cleanedSong/cleanedArtist) and client fallback.
+ * Used by /api/youtube (regex cleanedSong/cleanedArtist), /api/parseVideoTitle (regex merge), and client fallback.
  */
 
 function cleanBrackets(str) {

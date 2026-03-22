@@ -30,6 +30,16 @@ export function setSearchCache(query, data) {
   }
 }
 
+/** Clears cached results for one query (e.g. before “Refresh search” to refetch YouTube). */
+export function clearSearchCacheForQuery(query) {
+  if (!query?.trim()) return;
+  try {
+    localStorage.removeItem(`${SEARCH_CACHE_PREFIX}${query.trim()}`);
+  } catch {
+    // ignore
+  }
+}
+
 export function getRecentSearches() {
   try {
     const raw = localStorage.getItem(RECENT_KEY);

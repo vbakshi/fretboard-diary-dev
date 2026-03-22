@@ -12,7 +12,12 @@ const DIFFICULTY_STYLES = {
   Advanced: 'bg-red-600/30 text-red-400 border-red-500/50',
 };
 
-export default function LessonCard({ video, onFetchSummarize }) {
+export default function LessonCard({
+  video,
+  /** User’s search string for this result list; sent to Haiku with the video title. */
+  searchQuery = '',
+  onFetchSummarize,
+}) {
   const navigate = useNavigate();
   const { createLesson } = useLessons();
   const [loading, setLoading] = useState(false);
@@ -43,16 +48,53 @@ export default function LessonCard({ video, onFetchSummarize }) {
   const handleCreateLesson = async () => {
     setLoading(true);
     try {
-      const parsed =
-        typeof video.cleanedSong === 'string' ||
-        typeof video.cleanedArtist === 'string'
-          ? {
-              song: video.cleanedSong ?? '',
-              artist: video.cleanedArtist ?? '',
-            }
-          : parseVideoTitle(video.title, video.channel || '');
-      const song = parsed.song;
-      const artist = parsed.artist;
+      let song = '';
+      let artist = '';
+      let parseSource = 'regex';
+      try {
+        const parseRes = await fetch('/api/parseVideoTitle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: video.title,
+            channel: video.channel || '',
+            searchQuery: typeof searchQuery === 'string' ? searchQuery : '',
+          }),
+        });
+        if (parseRes.ok) {
+          const p = await parseRes.json();
+          song = p.song ?? '';
+          artist = p.artist ?? '';
+          parseSource = p.source === 'haiku' ? 'haiku' : 'regex';
+        }
+      } catch {
+        // fall through to regex
+      }
+      // Only apply regex heuristics when Haiku did not run; trust Haiku output for lyrics lookup
+      if (parseSource !== 'haiku') {
+        if (!String(song || '').trim() && !String(artist || '').trim()) {
+          const fb = parseVideoTitle(video.title, video.channel || '');
+          song = fb.song;
+          artist = fb.artist;
+        }
+        if (!String(song || '').trim()) {
+          const fb = parseVideoTitle(video.title, video.channel || '');
+          if (!String(song || '').trim()) song = fb.song;
+          if (!String(artist || '').trim()) artist = fb.artist;
+        } else {
+          const fb = parseVideoTitle(video.title, video.channel || '');
+          const sl = String(song).toLowerCase();
+          const fbl = fb.song.toLowerCase();
+          if (fb.song.length > song.length && fbl.includes(sl)) {
+            song = fb.song;
+            if (!String(artist || '').trim()) artist = fb.artist;
+          }
+        }
+        if (!String(artist || '').trim()) {
+          const fb = parseVideoTitle(video.title, video.channel || '');
+          if (!String(artist || '').trim()) artist = fb.artist;
+        }
+      }
       const placeholderSection = {
         label: 'Verse 1',
         lines: [
@@ -70,7 +112,7 @@ export default function LessonCard({ video, onFetchSummarize }) {
       let lyricsNotFound = true;
 
       try {
-        // POST /api/lyrics with song + artist from video.cleanedSong / cleanedArtist (Haiku-parsed on search).
+        // POST /api/lyrics — Haiku strings used as-is when source was haiku (no client regex merge).
         const data = await fetchLyricsPreferApiFirst(song, artist);
         const hasLyrics =
           !data.error &&
@@ -98,7 +140,8 @@ export default function LessonCard({ video, onFetchSummarize }) {
             practiceNote: s.practiceNote || '',
           }));
         }
-      } catch {
+      } catch (err) {
+        console.error('[lyrics] Create lesson fetch failed', err);
         lyricsNotFound = true;
         sections = [placeholderSection];
       }

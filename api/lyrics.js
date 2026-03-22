@@ -38,8 +38,12 @@ export default async function handler(req, res) {
       console.warn('[api/lyrics] no lyrics', { cleanSong, cleanArtist, error: result.error });
     } else {
       console.log('[api/lyrics] ok', {
+        cleanSong,
+        cleanArtist,
         source: result.source,
         sections: result.sections?.length,
+        title: result.title,
+        artist: result.artist,
       });
     }
     return res.status(200).json(result);

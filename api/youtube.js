@@ -1,5 +1,5 @@
 import './loadEnv.js';
-import { parseSongTitle, parseArtistName } from '../src/lib/parseVideoTitle.js';
+import { parseVideoTitle } from '../src/lib/parseVideoTitle.js';
 import { parseJsonBody } from './parseJsonBody.js';
 
 const CHORD_REGEX = /\b[A-G][#b]?(maj|min|m|sus|add|dim|aug)?[0-9]?\b/g;
@@ -16,79 +16,6 @@ function extractChordsFromText(text) {
 
 function countCommentMatches(comments, regex) {
   return comments.filter((c) => regex.test(c)).length;
-}
-
-/** Regex fallback when Haiku is unavailable or fails */
-function parseArtistAndSongRegex(rawTitle, channelTitle) {
-  return {
-    artist: parseArtistName(rawTitle, channelTitle),
-    song: parseSongTitle(rawTitle, channelTitle),
-  };
-}
-
-/**
- * Claude Haiku — extract artist + song from messy YouTube guitar lesson titles.
- * Falls back to regex if no API key or on error.
- */
-async function parseArtistAndSong(rawTitle, channelTitle = '') {
-  const apiKey =
-    process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey || !String(rawTitle || '').trim()) {
-    return parseArtistAndSongRegex(rawTitle, channelTitle);
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
-        messages: [
-          {
-            role: 'user',
-            content: `Extract the artist name and song name from this YouTube guitar lesson title. Return only a JSON object with no explanation, no markdown, nothing else: {"artist":"...","song":"..."}
-
-If you cannot determine the artist, return an empty string for artist.
-If you cannot determine the song, return an empty string for song.
-Never include words like "guitar", "lesson", "tutorial", "chords", "easy", "beginner", "acoustic", "cover" in either field.
-
-Title: ${JSON.stringify(String(rawTitle))}`,
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok || data?.error) {
-      return parseArtistAndSongRegex(rawTitle, channelTitle);
-    }
-
-    const text = data.content?.[0]?.text?.trim() ?? '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-
-    const artist = String(parsed.artist ?? '').trim();
-    const song = String(parsed.song ?? '').trim();
-
-    if (!song && !artist) {
-      return parseArtistAndSongRegex(rawTitle, channelTitle);
-    }
-
-    // If Haiku left song empty, merge regex for at least one usable field
-    if (!song) {
-      const fb = parseArtistAndSongRegex(rawTitle, channelTitle);
-      return { artist: artist || fb.artist, song: fb.song };
-    }
-
-    return { artist, song };
-  } catch {
-    return parseArtistAndSongRegex(rawTitle, channelTitle);
-  }
 }
 
 export default async function handler(req, res) {
@@ -142,8 +69,15 @@ export default async function handler(req, res) {
     videosMap[v.id] = v;
   });
 
+  const idsSlice = ids.slice(0, 20);
+
+  console.log('[api/youtube] search', {
+    query: query.trim(),
+    candidateVideos: idsSlice.length,
+  });
+
   const enriched = await Promise.all(
-    ids.slice(0, 20).map(async (videoId) => {
+    idsSlice.map(async (videoId) => {
       const v = videosMap[videoId];
       if (!v) return null;
 
@@ -153,25 +87,24 @@ export default async function handler(req, res) {
       const rawTitle = snippet.title || '';
       const channelTitle = snippet.channelTitle || '';
 
-      const [comments, parsed] = await Promise.all([
-        (async () => {
-          try {
-            const commentsRes = await fetch(
-              `${baseUrl}/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance&textFormat=plainText&key=${apiKey}`
-            );
-            const commentsData = await commentsRes.json();
-            return (commentsData.items || [])
-              .map(
-                (c) =>
-                  c.snippet?.topLevelComment?.snippet?.textDisplay || ''
-              )
-              .filter(Boolean);
-          } catch {
-            return [];
-          }
-        })(),
-        parseArtistAndSong(rawTitle, channelTitle),
-      ]);
+      const parsed = parseVideoTitle(rawTitle, channelTitle);
+
+      const comments = await (async () => {
+        try {
+          const commentsRes = await fetch(
+            `${baseUrl}/commentThreads?part=snippet&videoId=${videoId}&maxResults=20&order=relevance&textFormat=plainText&key=${apiKey}`
+          );
+          const commentsData = await commentsRes.json();
+          return (commentsData.items || [])
+            .map(
+              (c) =>
+                c.snippet?.topLevelComment?.snippet?.textDisplay || ''
+            )
+            .filter(Boolean);
+        } catch {
+          return [];
+        }
+      })();
 
       const chordsUsed = extractChordsFromText(desc);
       const chordsFromDescription = chordsUsed.length > 0;
