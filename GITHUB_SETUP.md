@@ -1,31 +1,25 @@
 # Push this project to GitHub ([@vbakshi](https://github.com/vbakshi))
 
-The git remote **`origin`** is already set to:
+The git remote **`origin`** is set to:
 
-`https://github.com/vbakshi/guitar_lesson_dairy.git`
+`https://github.com/vbakshi/fretboard-diary-dev.git`
 
-## 1. Create the empty repo on GitHub
+## 1. Repo on GitHub
 
-1. Open **[github.com/new](https://github.com/new)** while logged in as **vbakshi**.
-2. **Repository name:** `guitar_lesson_dairy` (must match the URL above).
-3. Choose **Public** or **Private**.
-4. **Do not** add a README, `.gitignore`, or license (this project already has them).
-5. Click **Create repository**.
+Use **[github.com/vbakshi/fretboard-diary-dev](https://github.com/vbakshi/fretboard-diary-dev)**.
+
+If you still need to create it: **[github.com/new](https://github.com/new)** → name **`fretboard-diary-dev`**, no README/gitignore/license if you’re pushing this existing project.
 
 ## 2. Push from your computer
-
-In the project folder:
 
 ```bash
 cd /Users/vinayak/projects/guitar_lesson_dairy
 git push -u origin main
 ```
 
-If Git asks you to sign in, use a [Personal Access Token](https://github.com/settings/tokens) as the password (HTTPS), or switch the remote to SSH:
+HTTPS sign-in: use a [Personal Access Token](https://github.com/settings/tokens) as the password. Or SSH:
 
 ```bash
-git remote set-url origin git@github.com:vbakshi/guitar_lesson_dairy.git
+git remote set-url origin git@github.com:vbakshi/fretboard-diary-dev.git
 git push -u origin main
 ```
-
-After a successful push, the repo will be at **<https://github.com/vbakshi/guitar_lesson_dairy>**.
