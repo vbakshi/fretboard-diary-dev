@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #1a1510;
+  --color-brand-surface: #2a2318;
+  --color-brand-border: #3d3426;
+  --color-brand-amber: #EF9F27;
+  --color-brand-amber-dark: #854F0B;
+  --color-brand-muted: #888780;
+  --color-brand-faint: #555048;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #1a1510;
+  color: white;
+  min-height: 100svh;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100svh;
+  padding-bottom: 80px;
+  box-sizing: border-box;
+  /* Single page scroll — avoid nested scroll traps */
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

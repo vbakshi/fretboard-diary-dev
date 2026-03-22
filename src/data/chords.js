@@ -1,0 +1,65 @@
+export const CHORDS = [
+  // Major
+  { name: "A", category: "major", frets: [-1, 0, 2, 2, 2, 0], fingers: [0, 0, 1, 2, 3, 0], baseFret: 1, barres: [] },
+  { name: "B", category: "major", frets: [-1, 2, 4, 4, 4, 2], fingers: [0, 1, 2, 3, 4, 1], baseFret: 1, barres: [{ fret: 2, fromString: 1, toString: 5 }] },
+  { name: "C", category: "major", frets: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], baseFret: 1, barres: [] },
+  { name: "D", category: "major", frets: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], baseFret: 1, barres: [] },
+  { name: "E", category: "major", frets: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0], baseFret: 1, barres: [] },
+  { name: "F", category: "major", frets: [1, 3, 3, 2, 1, 1], fingers: [1, 3, 4, 2, 1, 1], baseFret: 1, barres: [{ fret: 1, fromString: 1, toString: 6 }] },
+  { name: "G", category: "major", frets: [3, 2, 0, 0, 0, 3], fingers: [2, 1, 0, 0, 0, 4], baseFret: 1, barres: [] },
+
+  // Minor
+  { name: "Am", category: "minor", frets: [-1, 0, 2, 2, 1, 0], fingers: [0, 0, 2, 3, 1, 0], baseFret: 1, barres: [] },
+  { name: "Bm", category: "minor", frets: [-1, 2, 4, 4, 3, 2], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barres: [{ fret: 2, fromString: 1, toString: 5 }] },
+  { name: "Cm", category: "minor", frets: [-1, 3, 5, 5, 4, 3], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barres: [{ fret: 3, fromString: 1, toString: 5 }] },
+  { name: "Dm", category: "minor", frets: [-1, -1, 0, 2, 3, 1], fingers: [0, 0, 0, 2, 3, 1], baseFret: 1, barres: [] },
+  { name: "Em", category: "minor", frets: [0, 2, 2, 0, 0, 0], fingers: [0, 2, 3, 0, 0, 0], baseFret: 1, barres: [] },
+  { name: "Fm", category: "minor", frets: [1, 3, 3, 1, 1, 1], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barres: [{ fret: 1, fromString: 1, toString: 6 }] },
+  { name: "Gm", category: "minor", frets: [3, 5, 5, 3, 3, 3], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barres: [{ fret: 3, fromString: 1, toString: 6 }] },
+
+  // 7th
+  { name: "A7", category: "seventh", frets: [-1, 0, 2, 0, 2, 0], fingers: [0, 0, 2, 0, 3, 0], baseFret: 1, barres: [] },
+  { name: "B7", category: "seventh", frets: [-1, 2, 1, 2, 0, 2], fingers: [0, 2, 1, 3, 0, 4], baseFret: 1, barres: [] },
+  { name: "C7", category: "seventh", frets: [-1, 3, 2, 3, 1, 0], fingers: [0, 3, 2, 4, 1, 0], baseFret: 1, barres: [] },
+  { name: "D7", category: "seventh", frets: [-1, -1, 0, 2, 1, 2], fingers: [0, 0, 0, 2, 1, 3], baseFret: 1, barres: [] },
+  { name: "E7", category: "seventh", frets: [0, 2, 0, 1, 0, 0], fingers: [0, 2, 0, 1, 0, 0], baseFret: 1, barres: [] },
+  { name: "F7", category: "seventh", frets: [1, 3, 1, 2, 1, 1], fingers: [1, 3, 1, 2, 1, 1], baseFret: 1, barres: [{ fret: 1, fromString: 1, toString: 6 }] },
+  { name: "G7", category: "seventh", frets: [3, 2, 0, 0, 0, 1], fingers: [3, 2, 0, 0, 0, 1], baseFret: 1, barres: [] },
+
+  // Minor 7th / Maj7
+  { name: "Am7", category: "minor7", frets: [-1, 0, 2, 0, 1, 0], fingers: [0, 0, 2, 0, 1, 0], baseFret: 1, barres: [] },
+  { name: "Bm7", category: "minor7", frets: [-1, 2, 0, 2, 0, 2], fingers: [0, 1, 0, 2, 0, 3], baseFret: 1, barres: [] },
+  { name: "Dm7", category: "minor7", frets: [-1, -1, 0, 2, 1, 1], fingers: [0, 0, 0, 2, 1, 1], baseFret: 1, barres: [] },
+  { name: "Em7", category: "minor7", frets: [0, 2, 0, 0, 0, 0], fingers: [0, 2, 0, 0, 0, 0], baseFret: 1, barres: [] },
+  { name: "Gmaj7", category: "maj7", frets: [3, 2, 0, 0, 0, 2], fingers: [2, 1, 0, 0, 0, 3], baseFret: 1, barres: [] },
+  { name: "Cmaj7", category: "maj7", frets: [-1, 3, 2, 0, 0, 0], fingers: [0, 3, 2, 0, 0, 0], baseFret: 1, barres: [] },
+  { name: "Fmaj7", category: "maj7", frets: [1, 3, 2, 2, 1, 1], fingers: [1, 4, 2, 3, 1, 1], baseFret: 1, barres: [{ fret: 1, fromString: 1, toString: 6 }] },
+
+  // Suspended
+  { name: "Asus2", category: "suspended", frets: [-1, 0, 2, 2, 0, 0], fingers: [0, 0, 1, 2, 0, 0], baseFret: 1, barres: [] },
+  { name: "Asus4", category: "suspended", frets: [-1, 0, 2, 2, 3, 0], fingers: [0, 0, 1, 2, 3, 0], baseFret: 1, barres: [] },
+  { name: "Dsus2", category: "suspended", frets: [-1, -1, 0, 2, 3, 0], fingers: [0, 0, 0, 1, 3, 0], baseFret: 1, barres: [] },
+  { name: "Dsus4", category: "suspended", frets: [-1, -1, 0, 2, 3, 3], fingers: [0, 0, 0, 1, 2, 3], baseFret: 1, barres: [] },
+  { name: "Esus4", category: "suspended", frets: [0, 2, 2, 2, 0, 0], fingers: [0, 1, 2, 3, 0, 0], baseFret: 1, barres: [] },
+
+  // Add9
+  { name: "Cadd9", category: "add9", frets: [-1, 3, 2, 0, 3, 0], fingers: [0, 2, 1, 0, 4, 0], baseFret: 1, barres: [] },
+  { name: "Dadd9", category: "add9", frets: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], baseFret: 1, barres: [] },
+  { name: "Gadd9", category: "add9", frets: [3, 0, 0, 0, 0, 3], fingers: [2, 0, 0, 0, 0, 4], baseFret: 1, barres: [] },
+
+  // Power
+  { name: "A5", category: "power", frets: [-1, 0, 2, 2, 0, 0], fingers: [0, 0, 1, 2, 0, 0], baseFret: 1, barres: [] },
+  { name: "B5", category: "power", frets: [-1, 2, 4, 4, 0, 0], fingers: [0, 1, 3, 4, 0, 0], baseFret: 1, barres: [] },
+  { name: "C5", category: "power", frets: [-1, 3, 5, 5, 0, 0], fingers: [0, 1, 3, 4, 0, 0], baseFret: 1, barres: [] },
+  { name: "D5", category: "power", frets: [-1, -1, 0, 2, 3, 0], fingers: [0, 0, 0, 1, 2, 0], baseFret: 1, barres: [] },
+  { name: "E5", category: "power", frets: [0, 2, 2, 0, 0, 0], fingers: [0, 1, 2, 0, 0, 0], baseFret: 1, barres: [] },
+  { name: "G5", category: "power", frets: [3, 5, 5, 0, 0, 0], fingers: [1, 3, 4, 0, 0, 0], baseFret: 1, barres: [] },
+
+  // Common (sharps/flats)
+  { name: "F#m", category: "minor", frets: [2, 4, 4, 2, 2, 2], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barres: [{ fret: 2, fromString: 1, toString: 6 }] },
+  { name: "G#m", category: "minor", frets: [4, 6, 6, 4, 4, 4], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barres: [{ fret: 4, fromString: 1, toString: 6 }] },
+  { name: "C#m", category: "minor", frets: [-1, 4, 6, 6, 5, 4], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barres: [{ fret: 4, fromString: 1, toString: 5 }] },
+  { name: "D#m", category: "minor", frets: [-1, -1, 1, 3, 2, 1], fingers: [0, 0, 1, 3, 2, 1], baseFret: 6, barres: [] },
+  { name: "Bm7b5", category: "minor7", frets: [-1, 2, 0, 2, 0, 1], fingers: [0, 2, 0, 3, 0, 1], baseFret: 1, barres: [] },
+  { name: "A7sus4", category: "suspended", frets: [-1, 0, 2, 0, 3, 0], fingers: [0, 0, 2, 0, 3, 0], baseFret: 1, barres: [] },
+];
