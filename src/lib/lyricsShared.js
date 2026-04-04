@@ -66,6 +66,8 @@ export function parseLyrics(raw) {
         current = { label: `Verse ${nextNum}`, lines: [] };
       }
     } else {
+      // Omit lone "+" lines (scraper/UI noise) that add blank-looking rows
+      if (/^\++$/.test(trimmed)) continue;
       current.lines.push(trimmed);
     }
   }

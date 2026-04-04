@@ -7,6 +7,7 @@ import {
   addRecentSearch,
 } from '../hooks/useSearch';
 import LessonCard from '../components/LessonCard';
+import GuitarFretboard from '../components/GuitarFretboard';
 import SkeletonCard from '../components/SkeletonCard';
 
 function buildSuggestions(query, recentSearches, remoteSuggestions) {
@@ -229,6 +230,13 @@ export default function SearchPage() {
       <h1 className="mb-4 text-2xl font-semibold text-brand-amber">
         Fretboard Diary
       </h1>
+
+      <div className="-mx-4 mb-1 w-[calc(100%+2rem)] sm:mx-0 sm:mb-1 sm:w-full">
+        <GuitarFretboard />
+      </div>
+      <p className="mb-4 mt-1.5 text-center text-[11px] text-[#6b6560]">
+        tap a string to hear the open note
+      </p>
 
       <form onSubmit={handleSubmit} className="mb-4">
         <label htmlFor="fretboard-search" className="sr-only">

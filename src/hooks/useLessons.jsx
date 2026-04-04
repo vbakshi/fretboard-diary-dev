@@ -92,6 +92,15 @@ export function LessonsProvider({ children }) {
     [persist]
   );
 
+  const deleteLessons = useCallback(
+    (ids) => {
+      if (!ids?.length) return;
+      const idSet = new Set(ids);
+      persist((prev) => prev.filter((l) => !idSet.has(l.id)));
+    },
+    [persist]
+  );
+
   const getLesson = useCallback(
     (id) => lessons.find((l) => l.id === id),
     [lessons]
@@ -103,9 +112,10 @@ export function LessonsProvider({ children }) {
       createLesson,
       updateLesson,
       deleteLesson,
+      deleteLessons,
       getLesson,
     }),
-    [lessons, createLesson, updateLesson, deleteLesson, getLesson]
+    [lessons, createLesson, updateLesson, deleteLesson, deleteLessons, getLesson]
   );
 
   return (

@@ -51,6 +51,10 @@ export default function EditorPage() {
   const [lyricsNotFoundToast, setLyricsNotFoundToast] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const addChordAnchorRef = useRef(null);
+  const chordPaletteSectionRef = useRef(null);
+  const paletteAttentionTimerRef = useRef(null);
+  const [paletteHighlight, setPaletteHighlight] = useState(false);
+  const [sequencePaletteMessage, setSequencePaletteMessage] = useState('');
 
   const [applySequenceId, setApplySequenceId] = useState(null);
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
@@ -105,6 +109,14 @@ export default function EditorPage() {
 
   const [saveTrigger, setSaveTrigger] = useState(0);
   const debouncedTrigger = useDebounce(saveTrigger, 1000);
+
+  useEffect(() => {
+    return () => {
+      if (paletteAttentionTimerRef.current) {
+        clearTimeout(paletteAttentionTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!lessonId || debouncedTrigger === 0) return;
@@ -292,6 +304,27 @@ export default function EditorPage() {
   };
 
   const handleAddSequence = () => {
+    if (chordPalette.length === 0) {
+      setSequencePaletteMessage(
+        'Please add chords to the Chord Palette before creating sequences.'
+      );
+      setPaletteHighlight(true);
+      requestAnimationFrame(() => {
+        chordPaletteSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      });
+      if (paletteAttentionTimerRef.current) {
+        clearTimeout(paletteAttentionTimerRef.current);
+      }
+      paletteAttentionTimerRef.current = setTimeout(() => {
+        setPaletteHighlight(false);
+        setSequencePaletteMessage('');
+        paletteAttentionTimerRef.current = null;
+      }, 2800);
+      return;
+    }
     const id = uuid();
     setSequences((prev) => [
       ...prev,
@@ -435,6 +468,14 @@ export default function EditorPage() {
         )}
 
         <div className="px-4 pb-3 pt-8">
+          <div
+            ref={chordPaletteSectionRef}
+            className={`rounded-xl px-1 py-1 transition-[box-shadow,background-color] duration-300 ${
+              paletteHighlight
+                ? 'bg-brand-amber/10 shadow-[0_0_0_2px_rgba(239,159,39,0.9)]'
+                : 'shadow-[0_0_0_2px_transparent]'
+            }`}
+          >
           <p className="mb-2 text-[10px] font-normal uppercase tracking-[0.1em] text-[#6b6560]">
             CHORD PALETTE
           </p>
@@ -513,6 +554,7 @@ export default function EditorPage() {
               />
             </div>
           </div>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1">
             {progression.map((name, i) => (
@@ -533,6 +575,15 @@ export default function EditorPage() {
               </span>
             ))}
           </div>
+
+          {sequencePaletteMessage && (
+            <p
+              className="mt-3 text-center text-xs leading-snug text-brand-amber"
+              role="alert"
+            >
+              {sequencePaletteMessage}
+            </p>
+          )}
 
           <SequenceBuilder
             sequences={sequences}

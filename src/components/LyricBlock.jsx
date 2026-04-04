@@ -126,55 +126,71 @@ export default function LyricBlock({
       <div className="min-w-0 flex-1 overflow-visible">
         {!isEditing ? (
           <>
-            <div
-              className="mb-0.5 flex min-h-[18px] flex-wrap items-center gap-1.5"
-              style={{ gap: '5px' }}
-            >
-              {slots.map((slot, idx) => {
-                if (slot.pause) {
-                  return (
-                    <span
-                      key={idx}
-                      className="px-1 py-0.5 font-mono text-[11px] text-[#3d3830]"
-                    >
-                      —
-                    </span>
-                  );
-                }
-                if (slot.chord) {
-                  return (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 rounded border border-[#6b4e10] bg-[#2e2510] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#EF9F27]"
-                      style={{ borderWidth: '0.5px', borderRadius: '4px' }}
-                    >
-                      {slot.chord}
-                      <button
-                        type="button"
-                        onClick={() => onClearSlot(lineId, idx)}
-                        className="flex min-h-[24px] min-w-[24px] items-center justify-center text-[#6b4e10] transition-colors duration-150 ease-in-out hover:text-[#EF9F27]"
-                        aria-label={`Clear ${slot.chord}`}
-                      >
-                        <span className="text-[10px] leading-none">×</span>
-                      </button>
-                    </span>
-                  );
-                }
-                return null;
-              })}
-              <button
-                type="button"
-                onClick={startManualEdit}
-                className="border border-dashed border-[#2e2b25] bg-transparent px-1.5 py-0.5 text-[10px] italic text-[#3d3830] transition-colors duration-150 ease-in-out hover:border-[#EF9F27] hover:text-[#EF9F27]"
-                style={{ borderWidth: '0.5px', borderRadius: '4px' }}
+            {annotated && (
+              <div
+                className="mb-0.5 flex min-h-[18px] flex-wrap items-center gap-1.5"
+                style={{ gap: '5px' }}
               >
-                + chord
-              </button>
-            </div>
+                {slots.map((slot, idx) => {
+                  if (slot.pause) {
+                    return (
+                      <span
+                        key={idx}
+                        className="px-1 py-0.5 font-mono text-[11px] text-[#3d3830]"
+                      >
+                        —
+                      </span>
+                    );
+                  }
+                  if (slot.chord) {
+                    return (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 rounded border border-[#6b4e10] bg-[#2e2510] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#EF9F27]"
+                        style={{ borderWidth: '0.5px', borderRadius: '4px' }}
+                      >
+                        {slot.chord}
+                        <button
+                          type="button"
+                          onClick={() => onClearSlot(lineId, idx)}
+                          className="flex min-h-[24px] min-w-[24px] items-center justify-center text-[#6b4e10] transition-colors duration-150 ease-in-out hover:text-[#EF9F27]"
+                          aria-label={`Clear ${slot.chord}`}
+                        >
+                          <span className="text-[10px] leading-none">×</span>
+                        </button>
+                      </span>
+                    );
+                  }
+                  return null;
+                })}
+                <button
+                  type="button"
+                  onClick={startManualEdit}
+                  className="border border-dashed border-[#2e2b25] bg-transparent px-1.5 py-0.5 text-[10px] italic text-[#3d3830] transition-colors duration-150 ease-in-out hover:border-[#EF9F27] hover:text-[#EF9F27]"
+                  style={{ borderWidth: '0.5px', borderRadius: '4px' }}
+                >
+                  + chord
+                </button>
+              </div>
+            )}
             <div
               className={`font-serif text-[13px] leading-[1.5] ${
                 annotated ? 'text-[#d4cfc8]' : 'text-[#b0a898]'
-              }`}
+              } ${!annotated ? ' cursor-pointer rounded-sm hover:bg-[#2a2210]/50' : ''}`}
+              onClick={!annotated ? startManualEdit : undefined}
+              onKeyDown={
+                !annotated
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        startManualEdit();
+                      }
+                    }
+                  : undefined
+              }
+              role={!annotated ? 'button' : undefined}
+              tabIndex={!annotated ? 0 : undefined}
+              title={!annotated ? 'Tap to add chords for this line' : undefined}
             >
               {line.text || '\u00A0'}
             </div>
