@@ -8,6 +8,8 @@ import {
 } from '../hooks/useSearch';
 import LessonCard from '../components/LessonCard';
 import GuitarFretboard from '../components/GuitarFretboard';
+import LessonRecommender from '../components/LessonRecommender';
+import SearchBar from '../components/SearchBar';
 import SkeletonCard from '../components/SkeletonCard';
 
 function buildSuggestions(query, recentSearches, remoteSuggestions) {
@@ -54,7 +56,10 @@ export default function SearchPage() {
   const [highlightIndex, setHighlightIndex] = useState(-1);
 
   const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
   const listId = 'fretboard-search-suggestions';
+
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const recentSearches = getRecentSearches();
 
@@ -207,6 +212,15 @@ export default function SearchPage() {
     handleSearch(q);
   };
 
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((prev) => {
+      if (!prev) {
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      }
+      return !prev;
+    });
+  }, []);
+
   const fetchSummarize = async (video) => {
     if (!video.transcript) return null;
     try {
@@ -227,7 +241,7 @@ export default function SearchPage() {
 
   return (
     <div className="mx-auto max-w-[480px] px-4 py-6">
-      <h1 className="mb-4 text-2xl font-semibold text-brand-amber">
+      <h1 className="mb-4 font-diary text-4xl font-semibold leading-tight text-brand-amber">
         Fretboard Diary
       </h1>
 
@@ -238,142 +252,141 @@ export default function SearchPage() {
         tap a string to hear the open note
       </p>
 
-      <form onSubmit={handleSubmit} className="mb-4">
-        <label htmlFor="fretboard-search" className="sr-only">
-          Search a song or artist
-        </label>
-        <div ref={containerRef} className="relative">
-          <input
-            id="fretboard-search"
-            name="q"
-            type="search"
-            role="combobox"
-            aria-expanded={showDropdown}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={
-              highlightIndex >= 0 ? `${listId}-opt-${highlightIndex}` : undefined
-            }
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onKeyDown={onKeyDown}
-            placeholder="Search a song or artist..."
-            autoComplete="off"
-            enterKeyHint="search"
-            className="w-full rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-white placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-amber"
-          />
-          {showDropdown && (
-            <ul
-              id={listId}
-              role="listbox"
-              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border border-brand-border bg-brand-surface py-1 shadow-lg"
-            >
-              {suggestions.map((text, i) => (
-                <li
-                  key={`${text}-${i}`}
-                  id={`${listId}-opt-${i}`}
-                  role="option"
-                  aria-selected={i === highlightIndex}
-                  className={`flex min-h-[44px] cursor-pointer items-center px-4 py-3 text-left text-sm text-white ${
-                    i === highlightIndex ? 'bg-brand-bg' : 'hover:bg-brand-bg/80'
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => selectSuggestion(text)}
-                >
-                  {text}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </form>
+      <div className="mb-4 flex flex-col gap-[10px]">
+        <LessonRecommender />
 
-      {recentSearches.length > 0 && (
-        <div className="mb-4">
-          <p className="mb-2 text-xs uppercase tracking-wide text-brand-muted">
-            Recent searches
-          </p>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            {recentSearches.map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => handleRecentClick(q)}
-                className="shrink-0 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-sm text-brand-muted hover:border-brand-amber hover:text-white"
-              >
-                {q}
-              </button>
-            ))}
+        <div>
+          <button
+            type="button"
+            onClick={toggleSearch}
+            aria-expanded={searchOpen}
+            className="flex w-full items-center justify-between rounded-[10px] border border-[#3d3830] bg-[#221f1a] px-4 py-3 text-left transition-colors hover:border-[#4d4840]"
+            style={{ borderWidth: '0.5px' }}
+          >
+            <span className="text-sm font-medium text-[#EF9F27]">
+              🔎 Search yourself
+            </span>
+            <span
+              className={`inline-block text-[#6b6560] transition-transform duration-200 ease-out ${
+                searchOpen ? 'rotate-90' : ''
+              }`}
+              aria-hidden
+            >
+              ›
+            </span>
+          </button>
+
+          <div
+            className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+            style={{ maxHeight: searchOpen ? 2000 : 0 }}
+          >
+            <div className="pt-2.5">
+              <SearchBar
+                ref={searchInputRef}
+                containerRef={containerRef}
+                listId={listId}
+                query={query}
+                onQueryChange={setQuery}
+                showDropdown={showDropdown}
+                onInputFocus={() => setFocused(true)}
+                onKeyDown={onKeyDown}
+                highlightIndex={highlightIndex}
+                suggestions={suggestions}
+                onSelectSuggestion={selectSuggestion}
+                onSubmit={handleSubmit}
+              />
+
+              {recentSearches.length > 0 && (
+                <div className="mb-4">
+                  <p className="mb-2 text-xs uppercase tracking-wide text-brand-muted">
+                    Recent searches
+                  </p>
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+                    {recentSearches.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => handleRecentClick(q)}
+                        className="shrink-0 rounded-full border border-brand-border bg-brand-surface px-3 py-1.5 text-sm text-brand-muted hover:border-brand-amber hover:text-white"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {searchState === 'loading' && (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              )}
+
+              {searchState === 'results' && results && results.length > 0 && (
+                <div className="space-y-3">
+                  {usedCache && (
+                    <div
+                      role="status"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
+                    >
+                      <span>
+                        Showing cached results — no new YouTube search.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={refreshSearch}
+                        className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
+                      >
+                        Refresh search
+                      </button>
+                    </div>
+                  )}
+                  {results.map((video) => (
+                    <LessonCard
+                      key={video.videoId}
+                      video={video}
+                      searchQuery={searchQueryForResults}
+                      onFetchSummarize={fetchSummarize}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {searchState === 'empty' && (
+                <div className="py-12 text-center">
+                  {usedCache && !error && (
+                    <div
+                      role="status"
+                      className="mx-auto mb-4 flex max-w-sm flex-wrap items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
+                    >
+                      <span>Cached empty result — no new API call.</span>
+                      <button
+                        type="button"
+                        onClick={refreshSearch}
+                        className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
+                      >
+                        Refresh search
+                      </button>
+                    </div>
+                  )}
+                  {error ? (
+                    <p className="mx-auto max-w-sm text-sm text-brand-amber/90">
+                      {error}
+                    </p>
+                  ) : (
+                    <p className="text-brand-muted">
+                      No lessons found for this search — try a different song or
+                      artist
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
-
-      {searchState === 'loading' && (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
-      )}
-
-      {searchState === 'results' && results && results.length > 0 && (
-        <div className="space-y-3">
-          {usedCache && (
-            <div
-              role="status"
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
-            >
-              <span>
-                Showing cached results — no new YouTube search.
-              </span>
-              <button
-                type="button"
-                onClick={refreshSearch}
-                className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
-              >
-                Refresh search
-              </button>
-            </div>
-          )}
-          {/* cleanedSong/cleanedArtist are regex-only from search; Haiku runs in /api/parseVideoTitle when you create a lesson */}
-          {results.map((video) => (
-            <LessonCard
-              key={video.videoId}
-              video={video}
-              searchQuery={searchQueryForResults}
-              onFetchSummarize={fetchSummarize}
-            />
-          ))}
-        </div>
-      )}
-
-      {searchState === 'empty' && (
-        <div className="py-12 text-center">
-          {usedCache && !error && (
-            <div
-              role="status"
-              className="mx-auto mb-4 flex max-w-sm flex-wrap items-center justify-center gap-2 rounded-lg border border-brand-border bg-brand-bg/60 px-3 py-2 text-xs text-brand-muted"
-            >
-              <span>Cached empty result — no new API call.</span>
-              <button
-                type="button"
-                onClick={refreshSearch}
-                className="shrink-0 rounded-md border border-brand-amber/50 bg-brand-surface px-2 py-1 text-xs font-medium text-brand-amber hover:bg-brand-bg"
-              >
-                Refresh search
-              </button>
-            </div>
-          )}
-          {error ? (
-            <p className="mx-auto max-w-sm text-sm text-brand-amber/90">{error}</p>
-          ) : (
-            <p className="text-brand-muted">
-              No lessons found for this search — try a different song or artist
-            </p>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

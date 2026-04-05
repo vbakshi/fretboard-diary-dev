@@ -8,6 +8,8 @@
   --color-brand-amber-dark: #854F0B;
   --color-brand-muted: #888780;
   --color-brand-faint: #555048;
+  /* Handwritten cursive for app title (Caveat from Google Fonts) */
+  --font-diary: "Caveat", cursive;
 }
 
 body {
@@ -35,4 +37,18 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes study-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.study-pulse {
+  animation: study-pulse 2s ease-in-out infinite;
 }

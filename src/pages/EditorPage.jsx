@@ -7,6 +7,7 @@ import ChordPickerPopup from '../components/ChordPickerPopup';
 import LyricBlock from '../components/LyricBlock';
 import SequenceBuilder from '../components/SequenceBuilder';
 import ApplySequenceBar from '../components/ApplySequenceBar';
+import StudyVideoPanel from '../components/StudyVideoPanel';
 import {
   createEmptySlots,
   cloneSlots,
@@ -60,6 +61,58 @@ export default function EditorPage() {
   const [selectedLineIds, setSelectedLineIds] = useState(() => new Set());
   const [editingLineId, setEditingLineId] = useState(null);
   const [editingSequenceId, setEditingSequenceId] = useState(null);
+
+  const [studyMode, setStudyMode] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [showPauseHint, setShowPauseHint] = useState(false);
+  const ytPlayerRef = useRef(null);
+  const wasPlayingRef = useRef(false);
+  const ytContainerId = useMemo(() => `yt-player-${lessonId || 'lesson'}`, [lessonId]);
+
+  const handlePlayStateChange = useCallback((playing) => {
+    setVideoPlaying(playing);
+    if (playing) setShowPauseHint(false);
+  }, []);
+
+  useEffect(() => {
+    if (studyMode && videoPlaying) {
+      setEditingLineId(null);
+      setEditingSequenceId(null);
+    }
+  }, [studyMode, videoPlaying]);
+
+  useEffect(() => {
+    if (!studyMode) {
+      wasPlayingRef.current = false;
+      return;
+    }
+    if (wasPlayingRef.current && !videoPlaying) {
+      setShowPauseHint(true);
+      const timer = setTimeout(() => setShowPauseHint(false), 4000);
+      wasPlayingRef.current = videoPlaying;
+      return () => clearTimeout(timer);
+    }
+    wasPlayingRef.current = videoPlaying;
+  }, [studyMode, videoPlaying]);
+
+  const toggleStudyMode = useCallback(() => {
+    if (studyMode) {
+      try {
+        ytPlayerRef.current?.pauseVideo?.();
+      } catch {
+        /* ignore */
+      }
+      setVideoPlaying(false);
+      setStudyMode(false);
+      setShowPauseHint(false);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setStudyMode(true);
+      setVideoPlaying(false);
+    }
+  }, [studyMode]);
+
+  const blocksEditing = studyMode && videoPlaying;
 
   useEffect(() => {
     if (lesson) {
@@ -380,7 +433,7 @@ export default function EditorPage() {
           </button>
         </div>
       )}
-      <div className="z-30 flex flex-wrap items-start justify-between gap-2 border-b border-[#2e2b25] bg-[#1a1510] px-4 py-3">
+      <div className="sticky top-0 z-40 flex flex-wrap items-start justify-between gap-2 border-b border-[#2e2b25] bg-[#1a1510] px-4 py-3">
         <button
           type="button"
           onClick={() => navigate('/diary')}
@@ -393,11 +446,38 @@ export default function EditorPage() {
             type="text"
             value={songTitle}
             onChange={(e) => setSongTitle(e.target.value)}
-            className="w-full border-none bg-transparent text-xl font-semibold text-white outline-none placeholder-brand-muted"
+            readOnly={blocksEditing}
+            className="w-full border-none bg-transparent text-xl font-semibold text-white outline-none placeholder-brand-muted read-only:opacity-70"
             placeholder="Song title"
           />
           <p className="truncate text-sm text-brand-muted">{lesson.artist}</p>
         </div>
+        <button
+          type="button"
+          onClick={toggleStudyMode}
+          className="flex shrink-0 cursor-pointer items-center rounded-[20px] border border-[#3d3830] bg-[#221f1a]"
+          style={{
+            borderWidth: '0.5px',
+            padding: '4px 10px',
+            gap: 6,
+          }}
+          aria-pressed={studyMode}
+          aria-label={studyMode ? 'Exit study mode' : 'Enter study mode'}
+        >
+          <span
+            className={`shrink-0 rounded-full ${
+              studyMode ? 'bg-[#EF9F27] study-pulse' : 'bg-[#3d3830]'
+            }`}
+            style={{ width: 7, height: 7 }}
+            aria-hidden
+          />
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: studyMode ? '#EF9F27' : '#6b6560' }}
+          >
+            Study
+          </span>
+        </button>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {deleteConfirm ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-white">
@@ -405,14 +485,16 @@ export default function EditorPage() {
               <button
                 type="button"
                 onClick={handleDeleteLesson}
-                className="rounded bg-red-700 px-2 py-1 text-white hover:bg-red-600"
+                disabled={blocksEditing}
+                className="rounded bg-red-700 px-2 py-1 text-white hover:bg-red-600 disabled:pointer-events-none disabled:opacity-40"
               >
                 Yes, delete
               </button>
               <button
                 type="button"
                 onClick={() => setDeleteConfirm(false)}
-                className="rounded border border-brand-border px-2 py-1 text-brand-muted hover:text-white"
+                disabled={blocksEditing}
+                className="rounded border border-brand-border px-2 py-1 text-brand-muted hover:text-white disabled:pointer-events-none disabled:opacity-40"
               >
                 Cancel
               </button>
@@ -422,7 +504,8 @@ export default function EditorPage() {
               <button
                 type="button"
                 onClick={() => setDeleteConfirm(true)}
-                className="rounded px-2 py-1.5 text-lg leading-none text-brand-muted hover:text-red-400"
+                disabled={blocksEditing}
+                className="rounded px-2 py-1.5 text-lg leading-none text-brand-muted hover:text-red-400 disabled:pointer-events-none disabled:opacity-40"
                 aria-label="Delete lesson"
                 title="Delete lesson"
               >
@@ -431,7 +514,8 @@ export default function EditorPage() {
               <button
                 type="button"
                 onClick={persist}
-                className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg"
+                disabled={blocksEditing}
+                className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg disabled:pointer-events-none disabled:opacity-40"
               >
                 {saved ? 'Saved ✓' : 'Save'}
               </button>
@@ -440,33 +524,37 @@ export default function EditorPage() {
         </div>
       </div>
 
-      <div className="border-b border-[#2e2b25] bg-[#1a1510]">
-        {lesson.referenceVideo && (
-          <div className="flex items-center gap-2 bg-[#2a2318] px-4 py-2">
-            <img
-              src={lesson.referenceVideo.thumbnail}
-              alt=""
-              className="h-7 w-10 rounded object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-white">
-                {lesson.referenceVideo.title}
-              </p>
-              <p className="truncate text-xs text-brand-muted">
-                {lesson.referenceVideo.channel}
-              </p>
-            </div>
-            <a
-              href={lesson.referenceVideo.watchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 text-sm text-brand-amber"
-            >
-              ▶ Watch
-            </a>
+      {!studyMode && lesson.referenceVideo && (
+        <div className="flex items-center gap-2 border-b border-[#2e2b25] bg-[#2a2318] px-4 py-2">
+          <img
+            src={lesson.referenceVideo.thumbnail}
+            alt=""
+            className="h-7 w-10 rounded object-cover"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-white">
+              {lesson.referenceVideo.title}
+            </p>
+            <p className="truncate text-xs text-brand-muted">
+              {lesson.referenceVideo.channel}
+            </p>
           </div>
-        )}
+        </div>
+      )}
 
+      {studyMode && lesson.referenceVideo && (
+        <StudyVideoPanel
+          videoId={lesson.referenceVideo.videoId}
+          watchUrl={lesson.referenceVideo.watchUrl}
+          playerContainerId={ytContainerId}
+          playerRef={ytPlayerRef}
+          onPlayStateChange={handlePlayStateChange}
+          videoPlaying={videoPlaying}
+        />
+      )}
+
+      {!studyMode && (
+        <div className="border-b border-[#2e2b25] bg-[#1a1510]">
         <div className="px-4 pb-3 pt-8">
           <div
             ref={chordPaletteSectionRef}
@@ -605,27 +693,52 @@ export default function EditorPage() {
             noLinesSelected={noLinesSelected}
           />
         </div>
+        </div>
+      )}
 
-      </div>
-
-      <div className="px-4 py-4">
+      <div
+        className={`px-4 py-4 ${studyMode ? 'overflow-y-auto' : ''}`}
+        style={
+          studyMode
+            ? { maxHeight: 'calc(100vh - 387px)' }
+            : undefined
+        }
+      >
+        {studyMode && showPauseHint && (
+          <p
+            className="text-[11px] text-[#888780]"
+            style={{ padding: '8px 16px' }}
+          >
+            Video paused — tap any line to add chords
+          </p>
+        )}
         {sections.map((section, sectionIdx) => (
           <div key={sectionIdx} className="mb-6">
             <div className="mb-2 flex items-center gap-2">
-              <input
-                type="text"
-                value={section.label}
-                onChange={(e) => updateSectionLabel(sectionIdx, e.target.value)}
-                className="border-none bg-transparent text-xs font-medium uppercase tracking-wide text-brand-amber outline-none placeholder-brand-muted"
-                placeholder="Section"
-              />
-              <button
-                type="button"
-                onClick={() => addLineToSection(sectionIdx)}
-                className="text-lg text-brand-amber"
-              >
-                +
-              </button>
+              {blocksEditing ? (
+                <p className="border-none bg-transparent text-xs font-medium uppercase tracking-wide text-brand-amber">
+                  {section.label || 'Section'}
+                </p>
+              ) : (
+                <input
+                  type="text"
+                  value={section.label}
+                  onChange={(e) =>
+                    updateSectionLabel(sectionIdx, e.target.value)
+                  }
+                  className="border-none bg-transparent text-xs font-medium uppercase tracking-wide text-brand-amber outline-none placeholder-brand-muted"
+                  placeholder="Section"
+                />
+              )}
+              {!blocksEditing && (
+                <button
+                  type="button"
+                  onClick={() => addLineToSection(sectionIdx)}
+                  className="text-lg text-brand-amber"
+                >
+                  +
+                </button>
+              )}
             </div>
             {(section.lines || []).map((line, lineIdx) => {
               const lid = makeLineId(sectionIdx, lineIdx);
@@ -642,6 +755,7 @@ export default function EditorPage() {
                   onEditConfirm={handleEditConfirm}
                   onEditCancel={handleEditCancel}
                   onClearSlot={clearLineSlot}
+                  readOnly={blocksEditing}
                 />
               );
             })}
@@ -653,7 +767,8 @@ export default function EditorPage() {
                 updateSectionPracticeNote(sectionIdx, e.target.value)
               }
               onBlur={() => persist()}
-              className="mt-2 w-full rounded border border-brand-border bg-brand-surface px-2 py-1 text-sm text-brand-muted placeholder-brand-faint focus:outline-none focus:ring-1 focus:ring-brand-amber"
+              readOnly={blocksEditing}
+              className="mt-2 w-full rounded border border-brand-border bg-brand-surface px-2 py-1 text-sm text-brand-muted placeholder-brand-faint read-only:opacity-70 focus:outline-none focus:ring-1 focus:ring-brand-amber"
             />
             {sectionIdx < sections.length - 1 && (
               <div className="mt-4 border-t border-brand-amber/30" />

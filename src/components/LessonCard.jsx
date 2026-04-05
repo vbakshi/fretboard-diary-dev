@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useLessons } from '../hooks/useLessons';
 import { getAICache, setAICache } from '../hooks/useSearch';
-import { migrateLine, createEmptySlots } from '../utils/slots';
-import { fetchLyricsPreferApiFirst } from '../lib/lyricsShared.js';
-import { parseVideoTitle } from '../lib/parseVideoTitle.js';
+import { useCreateLesson } from '../hooks/useCreateLesson';
 
 const DIFFICULTY_STYLES = {
   Beginner: 'bg-green-600/30 text-green-400 border-green-500/50',
@@ -18,9 +14,7 @@ export default function LessonCard({
   searchQuery = '',
   onFetchSummarize,
 }) {
-  const navigate = useNavigate();
-  const { createLesson } = useLessons();
-  const [loading, setLoading] = useState(false);
+  const { createLessonFromVideo, creating } = useCreateLesson(searchQuery);
   const [aiData, setAIData] = useState(() => getAICache(video.videoId));
 
   const chordsToShow = aiData?.chordsUsed?.length
@@ -45,133 +39,10 @@ export default function LessonCard({
     });
   }, [needsAI, video.videoId, video.transcript, video.title, onFetchSummarize]);
 
-  const handleCreateLesson = async () => {
-    setLoading(true);
-    try {
-      let song = '';
-      let artist = '';
-      let parseSource = 'regex';
-      try {
-        const parseRes = await fetch('/api/parseVideoTitle', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: video.title,
-            channel: video.channel || '',
-            searchQuery: typeof searchQuery === 'string' ? searchQuery : '',
-          }),
-        });
-        if (parseRes.ok) {
-          const p = await parseRes.json();
-          song = p.song ?? '';
-          artist = p.artist ?? '';
-          parseSource = p.source === 'haiku' ? 'haiku' : 'regex';
-        }
-      } catch {
-        // fall through to regex
-      }
-      // Only apply regex heuristics when Haiku did not run; trust Haiku output for lyrics lookup
-      if (parseSource !== 'haiku') {
-        if (!String(song || '').trim() && !String(artist || '').trim()) {
-          const fb = parseVideoTitle(video.title, video.channel || '');
-          song = fb.song;
-          artist = fb.artist;
-        }
-        if (!String(song || '').trim()) {
-          const fb = parseVideoTitle(video.title, video.channel || '');
-          if (!String(song || '').trim()) song = fb.song;
-          if (!String(artist || '').trim()) artist = fb.artist;
-        } else {
-          const fb = parseVideoTitle(video.title, video.channel || '');
-          const sl = String(song).toLowerCase();
-          const fbl = fb.song.toLowerCase();
-          if (fb.song.length > song.length && fbl.includes(sl)) {
-            song = fb.song;
-            if (!String(artist || '').trim()) artist = fb.artist;
-          }
-        }
-        if (!String(artist || '').trim()) {
-          const fb = parseVideoTitle(video.title, video.channel || '');
-          if (!String(artist || '').trim()) artist = fb.artist;
-        }
-      }
-      const placeholderSection = {
-        label: 'Verse 1',
-        lines: [
-          {
-            text: 'Add your lyrics here...',
-            slots: createEmptySlots(),
-          },
-        ],
-        practiceNote: '',
-      };
-
-      let songTitle = song;
-      let artistOut = artist;
-      let sections = [placeholderSection];
-      let lyricsNotFound = true;
-
-      try {
-        // POST /api/lyrics — Haiku strings used as-is when source was haiku (no client regex merge).
-        const data = await fetchLyricsPreferApiFirst(song, artist);
-        const hasLyrics =
-          !data.error &&
-          Array.isArray(data.sections) &&
-          data.sections.some((s) =>
-            (s.lines || []).some((l) => {
-              const t = typeof l === 'string' ? l : l?.text || '';
-              return String(t).trim().length > 0;
-            })
-          );
-
-        if (hasLyrics) {
-          lyricsNotFound = false;
-          if (data.title) songTitle = data.title;
-          if (data.artist) artistOut = data.artist;
-          sections = data.sections.map((s) => ({
-            label: s.label,
-            lines: (s.lines || []).map((l) =>
-              migrateLine({
-                text: typeof l === 'string' ? l : l.text || '',
-                chords: Array.isArray(l?.chords) ? l.chords : [],
-                slots: l.slots,
-              })
-            ),
-            practiceNote: s.practiceNote || '',
-          }));
-        }
-      } catch (err) {
-        console.error('[lyrics] Create lesson fetch failed', err);
-        lyricsNotFound = true;
-        sections = [placeholderSection];
-      }
-
-      const chordPalette = [
-        ...new Set([...(video.chordsUsed || []), ...(aiData?.chordsUsed || [])]),
-      ].filter(Boolean);
-
-      const lesson = createLesson({
-        songTitle: songTitle,
-        artist: artistOut,
-        sequences: [],
-        referenceVideo: {
-          videoId: video.videoId,
-          title: video.title,
-          channel: video.channel,
-          thumbnail: video.thumbnail,
-          watchUrl: video.watchUrl,
-        },
-        chordPalette,
-        progression: chordPalette.slice(0, 4),
-        sections,
-      });
-
-      navigate(`/editor/${lesson.id}`, {
-        state: lyricsNotFound ? { lyricsNotFound: true } : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleCreateLesson = () => {
+    createLessonFromVideo(video, {
+      additionalChordsUsed: aiData?.chordsUsed || [],
+    });
   };
 
   const diffStyle = DIFFICULTY_STYLES[video.difficultyLabel] || DIFFICULTY_STYLES.Intermediate;
@@ -233,10 +104,10 @@ export default function LessonCard({
           <button
             type="button"
             onClick={handleCreateLesson}
-            disabled={loading}
+            disabled={creating}
             className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Fetching lyrics...' : '+ Create My Lesson'}
+            {creating ? 'Fetching lyrics...' : '+ Create My Lesson'}
           </button>
         </div>
       </div>

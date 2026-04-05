@@ -65,6 +65,7 @@ export default function LyricBlock({
   onEditConfirm,
   onEditCancel,
   onClearSlot,
+  readOnly = false,
 }) {
   const slots = line.slots?.length === 4 ? line.slots : createEmptySlots();
   const [draftSlots, setDraftSlots] = useState(() => cloneSlots(slots));
@@ -99,6 +100,53 @@ export default function LyricBlock({
   };
 
   const annotated = lineHasChordContent(slots);
+
+  if (readOnly) {
+    return (
+      <div className="pointer-events-none flex gap-0 rounded-lg px-1 py-1">
+        <div className="min-w-0 flex-1">
+          {annotated && (
+            <div
+              className="mb-0.5 flex min-h-[18px] flex-wrap items-center gap-1.5"
+              style={{ gap: '5px' }}
+            >
+              {slots.map((slot, idx) => {
+                if (slot.pause) {
+                  return (
+                    <span
+                      key={idx}
+                      className="px-1 py-0.5 font-mono text-[11px] text-[#3d3830]"
+                    >
+                      —
+                    </span>
+                  );
+                }
+                if (slot.chord) {
+                  return (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center rounded border border-[#6b4e10] bg-[#2e2510] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#EF9F27]"
+                      style={{ borderWidth: '0.5px', borderRadius: '4px' }}
+                    >
+                      {slot.chord}
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
+          <div
+            className={`font-serif text-[13px] leading-[1.5] ${
+              annotated ? 'text-[#e8e0d0]' : 'text-[#5a5248]'
+            }`}
+          >
+            {line.text || '\u00A0'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
