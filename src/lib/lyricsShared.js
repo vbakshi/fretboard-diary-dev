@@ -339,11 +339,24 @@ export async function fetchLyricsPreferApiFirst(song, artist) {
     cleanArtist,
   });
 
+  const apiLyricsTimeoutMs = 16000;
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const tid =
+    ctrl &&
+    setTimeout(() => {
+      try {
+        ctrl.abort();
+      } catch {
+        /* ignore */
+      }
+    }, apiLyricsTimeoutMs);
+
   try {
     const res = await fetch('/api/lyrics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ song: cleanSong, artist: cleanArtist }),
+      signal: ctrl?.signal,
     });
     const ct = res.headers.get('content-type') || '';
     const textPreview = !ct.includes('application/json') ? await res.clone().text().then((t) => t.slice(0, 120)) : '';
@@ -391,6 +404,8 @@ export async function fetchLyricsPreferApiFirst(song, artist) {
     lyricsFail('POST /api/lyrics fetch threw (e.g. dev server has no /api)', {
       message: e?.message || String(e),
     });
+  } finally {
+    if (tid) clearTimeout(tid);
   }
 
   lyricsVerbose('falling back to fetchLyricsFromSong (browser direct)');

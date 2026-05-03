@@ -32,8 +32,14 @@ export default async function handler(req, res) {
 
   console.log('[api/lyrics] request', { cleanSong, cleanArtist });
 
+  const timeoutMs = 22000;
   try {
-    const result = await fetchLyricsFromSong(cleanSong, cleanArtist);
+    const result = await Promise.race([
+      fetchLyricsFromSong(cleanSong, cleanArtist),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('lyrics_upstream_timeout')), timeoutMs)
+      ),
+    ]);
     if (result.error) {
       console.warn('[api/lyrics] no lyrics', { cleanSong, cleanArtist, error: result.error });
     } else {

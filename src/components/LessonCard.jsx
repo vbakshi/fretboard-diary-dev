@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getAICache, setAICache } from '../hooks/useSearch';
 import { useCreateLesson } from '../hooks/useCreateLesson';
+import { useAuth } from '../context/AuthContext';
+import CreateLessonAuthModal from './CreateLessonAuthModal';
 
 const DIFFICULTY_STYLES = {
   Beginner: 'bg-green-600/30 text-green-400 border-green-500/50',
@@ -14,8 +16,10 @@ export default function LessonCard({
   searchQuery = '',
   onFetchSummarize,
 }) {
+  const { user } = useAuth();
   const { createLessonFromVideo, creating } = useCreateLesson(searchQuery);
   const [aiData, setAIData] = useState(() => getAICache(video.videoId));
+  const [authGateOpen, setAuthGateOpen] = useState(false);
 
   const chordsToShow = aiData?.chordsUsed?.length
     ? aiData.chordsUsed
@@ -40,6 +44,10 @@ export default function LessonCard({
   }, [needsAI, video.videoId, video.transcript, video.title, onFetchSummarize]);
 
   const handleCreateLesson = () => {
+    if (!user) {
+      setAuthGateOpen(true);
+      return;
+    }
     createLessonFromVideo(video, {
       additionalChordsUsed: aiData?.chordsUsed || [],
     });
@@ -48,6 +56,19 @@ export default function LessonCard({
   const diffStyle = DIFFICULTY_STYLES[video.difficultyLabel] || DIFFICULTY_STYLES.Intermediate;
 
   return (
+    <>
+      <CreateLessonAuthModal
+        open={authGateOpen}
+        onClose={() => setAuthGateOpen(false)}
+        onContinueGuest={() => {
+          setAuthGateOpen(false);
+          createLessonFromVideo(video, {
+            guestMode: true,
+            additionalChordsUsed: aiData?.chordsUsed || [],
+          });
+        }}
+        videoTitle={video.title}
+      />
     <div className="flex gap-3 rounded-lg border border-brand-border bg-brand-surface p-3">
       <a
         href={video.watchUrl}
@@ -112,5 +133,6 @@ export default function LessonCard({
         </div>
       </div>
     </div>
+    </>
   );
 }

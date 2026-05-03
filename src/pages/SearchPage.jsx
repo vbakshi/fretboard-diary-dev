@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   getCachedSearch,
   setSearchCache,
@@ -42,6 +44,16 @@ function buildSuggestions(query, recentSearches, remoteSuggestions) {
 
 /** idle: no search yet | loading | results | empty */
 export default function SearchPage() {
+  const navigate = useNavigate();
+  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const displayName =
+    profile?.display_name?.trim() ||
+    profile?.username ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split('@')[0] ||
+    '';
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [searchState, setSearchState] = useState('idle');
@@ -114,6 +126,17 @@ export default function SearchPage() {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useEffect(() => {
+    if (!user || authLoading) return;
+    const next = sessionStorage.getItem('postAuthRedirect');
+    if (!next || next === '/') {
+      if (next === '/') sessionStorage.removeItem('postAuthRedirect');
+      return;
+    }
+    sessionStorage.removeItem('postAuthRedirect');
+    navigate(next, { replace: true });
+  }, [user, authLoading, navigate]);
 
   const handleSearch = useCallback(async (explicitQuery, opts = {}) => {
     const { forceRefresh = false } = opts;
@@ -241,9 +264,49 @@ export default function SearchPage() {
 
   return (
     <div className="mx-auto max-w-[480px] px-4 py-6">
-      <h1 className="mb-4 font-diary text-4xl font-semibold leading-tight text-brand-amber">
-        Fretboard Diary
-      </h1>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 text-center sm:text-left">
+          {user && displayName ? (
+            <p className="mb-1 font-diary text-lg font-medium tracking-wide text-[#c4b8a8]">
+              {displayName}&apos;s
+            </p>
+          ) : null}
+          <h1 className="font-diary text-5xl font-semibold leading-snug tracking-wide text-brand-amber">
+            Fretboard Diary
+          </h1>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+          {authLoading ? null : user ? (
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut();
+                navigate('/', { replace: true });
+              }}
+              className="text-xs text-brand-muted underline-offset-2 hover:text-white hover:underline"
+            >
+              Sign out
+            </button>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                state={{ from: '/' }}
+                className="text-xs font-medium text-brand-amber hover:underline"
+              >
+                Log in
+              </Link>
+              <Link
+                to="/auth"
+                state={{ from: '/' }}
+                className="text-xs text-brand-muted hover:text-white hover:underline"
+              >
+                Sign up
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="-mx-4 mb-1 w-[calc(100%+2rem)] sm:mx-0 sm:mb-1 sm:w-full">
         <GuitarFretboard />

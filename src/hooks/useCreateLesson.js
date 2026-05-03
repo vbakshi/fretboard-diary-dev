@@ -4,6 +4,28 @@ import { useLessons } from './useLessons';
 import { migrateLine, createEmptySlots } from '../utils/slots';
 import { fetchLyricsPreferApiFirst } from '../lib/lyricsShared.js';
 import { parseVideoTitle } from '../lib/parseVideoTitle.js';
+import { uuid } from '../utils/uuid';
+
+/** Ensures lyrics lookup cannot block lesson creation indefinitely (slow /api/lyrics or LRCLIB). */
+const LYRICS_TOTAL_MS = 34000;
+
+async function fetchLyricsCapped(song, artist) {
+  return Promise.race([
+    fetchLyricsPreferApiFirst(song, artist),
+    new Promise((resolve) =>
+      setTimeout(
+        () =>
+          resolve({
+            error: 'Lyrics lookup timed out — you can add lyrics manually.',
+            sections: [],
+            title: String(song || '').trim(),
+            artist: String(artist || '').trim(),
+          }),
+        LYRICS_TOTAL_MS
+      )
+    ),
+  ]);
+}
 
 /**
  * Shared “Create lesson from YouTube video” flow (parse title → lyrics → save → editor).
@@ -11,7 +33,7 @@ import { parseVideoTitle } from '../lib/parseVideoTitle.js';
  */
 export function useCreateLesson(defaultSearchQuery = '') {
   const navigate = useNavigate();
-  const { createLesson } = useLessons();
+  const { createLesson, registerGuestLesson } = useLessons();
   const [creating, setCreating] = useState(false);
 
   const createLessonFromVideo = useCallback(
@@ -21,6 +43,7 @@ export function useCreateLesson(defaultSearchQuery = '') {
           ? options.searchQuery
           : defaultSearchQuery;
       const additionalChordsUsed = options.additionalChordsUsed || [];
+      const guestMode = Boolean(options.guestMode);
 
       setCreating(true);
       try {
@@ -88,7 +111,7 @@ export function useCreateLesson(defaultSearchQuery = '') {
         let lyricsNotFound = true;
 
         try {
-          const data = await fetchLyricsPreferApiFirst(song, artist);
+          const data = await fetchLyricsCapped(song, artist);
           const hasLyrics =
             !data.error &&
             Array.isArray(data.sections) &&
@@ -128,17 +151,42 @@ export function useCreateLesson(defaultSearchQuery = '') {
           ]),
         ].filter(Boolean);
 
-        const lesson = createLesson({
+        const referenceVideo = {
+          videoId: video.videoId,
+          title: video.title,
+          channel: video.channel,
+          thumbnail: video.thumbnail,
+          watchUrl: video.watchUrl,
+        };
+
+        if (guestMode) {
+          const now = new Date().toISOString();
+          const lessonLocal = registerGuestLesson({
+            id: uuid(),
+            userId: '',
+            songTitle,
+            artist: artistOut,
+            sequences: [],
+            referenceVideo,
+            chordPalette,
+            progression: chordPalette.slice(0, 4),
+            sections,
+            visibility: 'private',
+            status: 'building',
+            createdAt: now,
+            updatedAt: now,
+          });
+          navigate(`/editor/${lessonLocal.id}`, {
+            state: lyricsNotFound ? { lyricsNotFound: true } : undefined,
+          });
+          return;
+        }
+
+        const lesson = await createLesson({
           songTitle: songTitle,
           artist: artistOut,
           sequences: [],
-          referenceVideo: {
-            videoId: video.videoId,
-            title: video.title,
-            channel: video.channel,
-            thumbnail: video.thumbnail,
-            watchUrl: video.watchUrl,
-          },
+          referenceVideo,
           chordPalette,
           progression: chordPalette.slice(0, 4),
           sections,
@@ -147,11 +195,13 @@ export function useCreateLesson(defaultSearchQuery = '') {
         navigate(`/editor/${lesson.id}`, {
           state: lyricsNotFound ? { lyricsNotFound: true } : undefined,
         });
+      } catch (err) {
+        console.error('[createLesson]', err);
       } finally {
         setCreating(false);
       }
     },
-    [createLesson, defaultSearchQuery, navigate]
+    [createLesson, registerGuestLesson, defaultSearchQuery, navigate]
   );
 
   return { createLessonFromVideo, creating };

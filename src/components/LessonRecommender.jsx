@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCreateLesson } from '../hooks/useCreateLesson';
+import { useAuth } from '../context/AuthContext';
+import CreateLessonAuthModal from './CreateLessonAuthModal';
 
 const BEGINNER_ARTISTS = [
   'Ed Sheeran', 'Taylor Swift', 'Oasis', 'The Beatles', 'Bob Dylan',
@@ -76,7 +78,9 @@ const DIFF_STYLES = {
 };
 
 export default function LessonRecommender() {
+  const { user } = useAuth();
   const { createLessonFromVideo, creating } = useCreateLesson('');
+  const [authGateOpen, setAuthGateOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [step, setStep] = useState(1);
   const [difficulty, setDifficulty] = useState(null);
@@ -183,6 +187,10 @@ export default function LessonRecommender() {
 
   const handleCreateLesson = () => {
     if (!recommended) return;
+    if (!user) {
+      setAuthGateOpen(true);
+      return;
+    }
     createLessonFromVideo(recommended, {
       searchQuery: lastQueryRef.current,
     });
@@ -192,6 +200,19 @@ export default function LessonRecommender() {
 
   return (
     <div className="mb-0">
+      <CreateLessonAuthModal
+        open={authGateOpen}
+        onClose={() => setAuthGateOpen(false)}
+        onContinueGuest={() => {
+          setAuthGateOpen(false);
+          if (!recommended) return;
+          createLessonFromVideo(recommended, {
+            searchQuery: lastQueryRef.current,
+            guestMode: true,
+          });
+        }}
+        videoTitle={recommended?.title}
+      />
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}

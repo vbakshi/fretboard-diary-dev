@@ -8,6 +8,7 @@ import LyricBlock from '../components/LyricBlock';
 import SequenceBuilder from '../components/SequenceBuilder';
 import ApplySequenceBar from '../components/ApplySequenceBar';
 import StudyVideoPanel from '../components/StudyVideoPanel';
+import VisibilitySelector from '../components/VisibilitySelector';
 import {
   createEmptySlots,
   cloneSlots,
@@ -396,9 +397,11 @@ export default function EditorPage() {
 
   const handleDeleteLesson = useCallback(() => {
     if (!lessonId) return;
+    const current = getLesson(lessonId);
+    const dest = current?.persistLocallyOnly ? '/' : '/diary';
     deleteLesson(lessonId);
-    navigate('/diary');
-  }, [lessonId, deleteLesson, navigate]);
+    navigate(dest);
+  }, [lessonId, deleteLesson, navigate, getLesson]);
 
   const applyDisabled =
     !applySequenceId || selectedLineIds.size === 0;
@@ -410,14 +413,16 @@ export default function EditorPage() {
         Lesson not found.{' '}
         <button
           type="button"
-          onClick={() => navigate('/diary')}
+          onClick={() => navigate('/')}
           className="text-brand-amber"
         >
-          Back to Diary
+          Back home
         </button>
       </div>
     );
   }
+
+  const backTarget = lesson.persistLocallyOnly ? '/' : '/diary';
 
   return (
     <div className="mx-auto min-h-screen max-w-[480px] bg-[#1a1510]">
@@ -433,10 +438,23 @@ export default function EditorPage() {
           </button>
         </div>
       )}
+      {lesson.persistLocallyOnly && (
+        <div className="border-b border-brand-border bg-brand-surface px-4 py-2 text-center text-xs text-brand-muted">
+          Guest lesson — saved only on this device until you{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/auth')}
+            className="text-brand-amber underline-offset-2 hover:underline"
+          >
+            sign in
+          </button>{' '}
+          and create a diary lesson.
+        </div>
+      )}
       <div className="sticky top-0 z-40 flex flex-wrap items-start justify-between gap-2 border-b border-[#2e2b25] bg-[#1a1510] px-4 py-3">
         <button
           type="button"
-          onClick={() => navigate('/diary')}
+          onClick={() => navigate(backTarget)}
           className="shrink-0 text-xl text-brand-amber"
         >
           ←
@@ -478,6 +496,19 @@ export default function EditorPage() {
             Study
           </span>
         </button>
+        {lesson.persistLocallyOnly ? (
+          <span
+            className="flex max-w-[140px] items-center rounded-full border border-[#3d3830] bg-[#221f1a] px-2.5 py-1 text-[11px] font-medium text-brand-muted"
+            style={{ borderWidth: '0.5px' }}
+          >
+            👤 Guest only
+          </span>
+        ) : (
+          <VisibilitySelector
+            lessonId={lessonId}
+            visibility={lesson.visibility || 'private'}
+          />
+        )}
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {deleteConfirm ? (
             <div className="flex flex-wrap items-center gap-2 text-xs text-white">
@@ -517,7 +548,11 @@ export default function EditorPage() {
                 disabled={blocksEditing}
                 className="rounded bg-brand-amber px-3 py-1.5 text-sm font-medium text-brand-bg disabled:pointer-events-none disabled:opacity-40"
               >
-                {saved ? 'Saved ✓' : 'Save'}
+                {saved
+                  ? lesson.persistLocallyOnly
+                    ? 'Saved locally ✓'
+                    : 'Saved ✓'
+                  : 'Save'}
               </button>
             </>
           )}
